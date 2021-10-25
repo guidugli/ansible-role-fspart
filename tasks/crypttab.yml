@@ -1,0 +1,43 @@
+---
+
+- name: "Create directory {{ crypt_path }}"
+  vars:
+    crypt_path: "{{ fspart_cryptkeys_path | default('/etc/cryptkeys', true) }}"
+  file:
+    path: "{{ crypt_path }}"
+    owner: root
+    group: root
+    mode: '0700'
+    state: directory
+    modification_time: preserve
+    access_time: preserve
+
+- name: Copy file with owner and permissions
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ fspart_cryptkeys_path }}/{{ item.name }}"
+    owner: root
+    group: root
+    mode: '0600'
+  loop: "{{ fspart_cryptkeys_files }}"
+  when: fspart_cryptkeys_files is defined
+
+- name: Set crypttab
+  crypttab:
+    name: "{{ item.name }}"
+    backing_device: "{{ item.backing_device }}"
+    password: "{{ item.password }}"
+    opts: "{{ item.opts }}"
+    state: present
+  loop: "{{ fspart_crypttab_entries }}"
+  when: fspart_crypttab_entries is defined
+
+- name: Run systemd to load the crypttab entries
+  vars:
+    encoded: "{{ item.name | replace('-','\\x2d') }}"
+  systemd:
+    name: "systemd-cryptsetup@{{ encoded }}"
+    state: started
+    daemon_reload: yes
+  loop: "{{ fspart_crypttab_entries }}"
+  when: fspart_crypttab_entries is defined

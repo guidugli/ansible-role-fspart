@@ -1,0 +1,32 @@
+---
+##
+# Instead of worrying with undefined values and setting defaults, do it here in one place.
+##
+
+- name: Initialize variable
+  set_fact:
+    fspart_process_input_var: []
+
+- name: Add missing information with default values
+  vars:
+    # Not pretty but does the job
+    tmprec:
+      name: "{{ item.name | default('', true) }}"
+      mount_options: "{{ item.mount_options | default([]) }}"
+      mount_state: "{{ item.mount_state | default('mounted') }}"
+      validate_options: "{{ item.validate_options | default([]) }}"
+      autofix: "{{ item.autofix | default(false) }}"
+      unit_name: "{{ item.unit_name | default('no_unit_name') }}"
+    tmprec2: "{{ (tmprec | combine({ 'src': item.src })) if item.src is defined else tmprec }}"
+    tmprec3: "{{ (tmprec2 | combine({ 'fstype': item.fstype })) if item.fstype is defined else tmprec2 }}"
+  set_fact:
+    fspart_process_input_var: >
+      {{ fspart_process_input_var | default([]) + [ tmprec3 ] }}
+  loop: "{{ partitions }}"
+
+# now overwrite partitions variable with the processed data
+- name: Set final values to partitions variable
+  set_fact:
+    partitions: "{{ fspart_process_input_var }}"
+
+#- debug: var=fspart_process_input_var

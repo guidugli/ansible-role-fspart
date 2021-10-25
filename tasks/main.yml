@@ -1,0 +1,31 @@
+---
+# tasks file for fspart
+
+- name: Process input variables, adding default values
+  import_tasks: vars_defaults.yml
+
+- name: Check partition variables
+  import_tasks: asserts.yml
+
+- name: enable fstrim service
+  systemd:
+    name: fstrim.timer
+    enabled: yes
+  when: fs_fstrim_timer_enabled
+
+- name: Check crypttab entries
+  import_tasks: crypttab.yml
+
+- name: Check systemd unit files for each partition with autofix set to true (unit_name != fstab)
+  include_tasks: systemdmount.yml
+  loop: "{{ partitions | selectattr('autofix') | rejectattr('unit_name','equalto','fstab') | list }}"
+
+- name: Check fstab file for each partition with autofix set to true (unit_name == fstab)
+  include_tasks: fstab.yml
+  loop: "{{ partitions | selectattr('autofix') | selectattr('unit_name', 'equalto', 'fstab') | list }}"
+
+- name: Validate mount points
+  import_tasks: validate.yml
+
+- name: Fix filesystems permissions
+  import_tasks: fix_permissions.yml

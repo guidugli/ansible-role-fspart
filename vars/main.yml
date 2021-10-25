@@ -1,0 +1,28 @@
+---
+# vars file for fspart
+
+# This is the place to create custom units or to
+# copy existing units from other places in order to
+# customize it.
+# Units found in other locations will be written
+# to this location by this role, to prevent
+# updates overwritting customizations.
+fspart_systemd_etc_path: /etc/systemd/system
+
+# If not already on etc path, this is the second
+# place to look for units
+fspart_systemd_lib_path: /lib/systemd/system
+
+# On Debian family systems this path has tmp.mount
+# definition. So, this is the third path that
+# the role will search for units.
+fspart_systemd_share_path: /usr/share/systemd
+
+# This variable will be set during processing with the
+# unit name being processed so handler can work on the
+# correct mount unit file.
+fspart_unit_notify: ''
+
+# list of filesystem types allowed to use in fstab
+fspart_allowed_fstype: ['ext', 'ext2', 'ext3', 'ext4', 'vfat', 'cifs', 'fat', 'iso9660', 'ntfs',
+                        'xfs', 'btrfs', 'tmpfs']

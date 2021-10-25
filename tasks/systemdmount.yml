@@ -1,0 +1,113 @@
+---
+# Tasks to setup or maintain systemd mount units
+# It is on a specific file so it can work with a loop
+
+# Autofix will check and adjust configuration files so the filesystem
+# is mounted properly. If the unit cannot be found in /etc/systemd/system,
+# the role will attempt to copy a local file with same unit name from
+# role's file directory, to the target system. If a local file with the
+# unit name is found locally on role's file directory, it will try to copy \
+# it from /lib/systemd/system.
+# NOTE: files on /etc/systemd/system will NOT be overwritten
+
+- name: Set variable to be used on notifications
+  set_fact:
+    fspart_unit_notify: "{{ item.unit_name }}"
+
+- name: "Check if {{ item.unit_name }} exists on known systemd locations"
+  raw: "test -e {{ fileitem }}"
+  register: fspart_unit_location
+  changed_when: false
+  ignore_errors: yes
+  loop:
+    - "{{ fspart_systemd_etc_path }}/{{ item.unit_name }}"
+    - "{{ fspart_systemd_lib_path }}/{{ item.unit_name }}"
+    - "{{ fspart_systemd_share_path }}/{{ item.unit_name }}"
+  loop_control:
+    loop_var: fileitem
+
+#- debug: var=fspart_unit_location
+
+- name: Storing search results
+  set_fact:
+    fspart_systemd_unit_path: "{{ (fspart_unit_location.results | selectattr('rc','equalto',0) |
+                              first).fileitem | default('not found') }}"
+    fspart_systemd_unit_found: "{{ (fspart_unit_location.results | selectattr('rc','equalto',0) | first) is defined  }}"
+
+- name: "Result:"
+  debug:
+    msg: "Unit {{ item.unit_name }} location: {{ fspart_systemd_unit_path }}"
+
+  # If not exist on etc path, try to copy unit first from ansible controller
+  # then try to copy from systemd locations
+- name: "Copy {{ item.unit_name }} from source locations to {{ fspart_systemd_etc_path }}"
+  block:
+
+    # First try to copy the unit file from controller
+    - name: "Try to copy unit file {{ item.unit_name }} from ansible controller"
+      copy:
+        src: "{{ item.unit_name }}"
+        dest: "{{ fspart_systemd_etc_path }}/{{ item.unit_name }}"
+        force: no
+        owner: root
+        group: root
+        mode: '0644'
+        remote_src: no
+      ignore_errors: yes
+      no_log: yes
+      notify: reload systemd configuration
+      register: fspart_copy_result
+
+    - name: Fail if unit do not exist on ansible controller or on remote host
+      fail:
+        msg: "Unit {{ item.unit_name }} do not exist on ansible controller or on remote host"
+      when: fspart_copy_result is failed and not fspart_systemd_unit_found
+
+    # If it fails (do not exist on the controller) then try to copy it from
+    # remote host systemd locations
+    - name: "Copying {{ fspart_systemd_unit_path }} to {{ fspart_systemd_etc_path }}/{{ item.unit_name }}"
+      copy:
+        src: "{{ fspart_systemd_unit_path }}"
+        dest: "{{ fspart_systemd_etc_path }}/{{ item.unit_name }}"
+        force: no
+        owner: root
+        group: root
+        mode: '0644'
+        remote_src: yes
+      notify: reload systemd configuration
+      when: fspart_systemd_unit_found and fspart_copy_result is failed
+
+  when: fspart_systemd_unit_path != fspart_systemd_etc_path + '/' + item.unit_name
+
+- name: "Fix values in {{ fspart_systemd_etc_path }}/{{ item.unit_name }} if required"
+  block:
+
+    # Only found this problem on tmp.mount of Fedora 33 but it does not hurt
+    # to check on every platform
+    - name: "Add missing install section (if needed) for {{ item.unit_name }}"
+      ini_file:
+        path: '{{ fspart_systemd_etc_path }}/{{ item.unit_name }}'
+        section: Install
+        option: WantedBy
+        value: local-fs.target
+        no_extra_spaces: yes
+        mode: '0644'
+      notify:
+        - reload systemd configuration
+        - restart systemd unit
+        - reboot
+
+    - name: "Configure config file options for unit {{ item.unit_name }}"
+      lineinfile:
+        path: "{{ fspart_systemd_etc_path }}/{{ item.unit_name }}"
+        regexp: 'Options='
+        line: "{{ 'Options=' + (item['mount_options'] | join(',')) }}"
+        state: present
+      notify:
+        - reload systemd configuration
+        - restart systemd unit
+        - reboot
+
+
+- name: Force systemd to reload in order to enable it to notice the changes
+  meta: flush_handlers

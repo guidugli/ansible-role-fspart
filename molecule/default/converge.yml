@@ -1,0 +1,61 @@
+---
+- name: Converge
+  hosts: all
+  vars:
+    fs_world_writeable_fix_enabled: yes
+    partitions:
+      - name: /tmp
+        unit_name: tmp.mount
+        mount_options: ['mode=1777', 'strictatime', 'nodev', 'nosuid', 'noexec']
+        validate_options: ['nodev', 'nosuid', 'noexec']
+        autofix: yes
+      - name: /var/tmp
+        options: ['nodev', 'nosuid', 'noexec']
+        unit_name: fstab
+        mount_options: ['strictatime', 'nodev', 'nosuid', 'noexec']
+        validate_options: ['nodev', 'nosuid', 'noexec']
+        src: 'tmpfs'
+        fstype: tmpfs
+        autofix: yes
+      - name: /tmp_dir
+        unit_name: tmp_dir.mount
+        mount_options: ['mode=1777', 'strictatime', 'nodev', 'nosuid', 'noexec']
+        validate_options: ['nodev', 'nosuid', 'noexec']
+        autofix: yes
+    fspart_allow_reboot: false
+    fspart_log_exception:
+      - /var/log
+      - /var/log/gdm
+      - /var/log/journal
+      - /var/log/btmp
+      - /var/log/journal/9ac3b4eccf62428bb4ae3d755c53b793
+      - /var/log/lastlog
+      - /var/log/wtmp
+
+  pre_tasks:
+
+    - name: Create fstab file
+      file:
+        path: /etc/fstab
+        state: touch
+        modification_time: preserve
+        access_time: preserve
+        mode: '0644'
+        owner: root
+        group: root
+
+    - name: update Ubuntu/Debian systems
+      apt:
+#        upgrade: dist
+        update_cache: true
+        cache_valid_time: 3600
+      when: ansible_pkg_mgr == "apt"
+
+    - name: Make sure some packages are installed
+      ansible.builtin.package:
+        name:
+          - findutils
+        state: latest
+
+  roles:
+    - role: guidugli.fspart

@@ -1,0 +1,166 @@
+---
+
+- name: Review and fix file permissions under /var/log
+  block:
+    - name: Find if any file under /var/log need to have the permission fixed
+      command: >
+        find /var/log -type f -perm /g=xw,o=rwx -ls -o -type d -perm /g=w,o=rwx -ls
+      register: fs_cmd_result
+      changed_when: false
+
+    - name: Display result
+      debug:
+        msg:
+          - "------- FILES THAT WILL BE FIXED -------"
+          - "{{ fs_cmd_result.stdout_lines }}"
+          - "----------------------------------------"
+
+    - name: Ensure permissions on all logfiles are configured
+      command: >
+        find /var/log -type f -exec chmod g-wx,o-rwx "{}" + -o -type d -exec chmod g-w,o-rwx "{}" +
+      changed_when: true
+      when: fs_cmd_result.stdout | length > 0
+
+    - name: Verify if the files were indeed corrected
+      command: >
+        find /var/log -type f -perm /g=xw,o=rwx -ls -o -type d -perm /g=w,o=rwx -ls
+      register: fs_cmd_result_fixed
+      changed_when: false
+      failed_when: fs_cmd_result_fixed.stdout | length > 0 or fs_cmd_result_fixed.rc != 0
+      when: fs_cmd_result.stdout | length > 0
+
+  tags:
+    - var-log-perm-fix
+
+- name: Ensure no world writable files exist
+  block:
+    - name: Search for world writable files
+      shell: |
+        set -o pipefail
+        df --local -P | grep -v '/run/user' | grep -v '/tmp' | grep -v '/dev' |
+        awk '{if (NR!=1) print $6}' | xargs -I '{}' find '{}' -xdev -type f -perm -0002
+      args:
+        executable: /bin/bash
+      register: fs_cmd_result
+      changed_when: false
+
+    - name: Display result
+      debug:
+        msg:
+          - "------- FILES THAT CAN BE FIXED -------"
+          - "{{ fs_cmd_result.stdout_lines }}"
+          - "---------------------------------------"
+
+    - name: Ensure files cannot be written by everyone
+      file:
+        path: "{{ item }}"
+        mode: o-w
+      when: (fs_cmd_result.stdout | length > 0) and fs_world_writeable_fix_enabled
+      loop: "{{ fs_cmd_result.stdout_lines }}"
+
+  tags:
+    - world-writable-fix
+
+# Ensure no unowned files exist
+# Stop execution with failure if any exists
+- name: Ensure no unowned files exist
+  block:
+    - name: Find any unowned files
+      shell: |
+        set -o pipefail
+        /usr/bin/df --local -P | grep -v '/run/user' |
+        /usr/bin/awk {' if (NR!=1) print $6'} | grep -v '/dev' | grep -v /sys |
+        /usr/bin/xargs -I '{}' find '{}' -xdev -nouser |
+        grep -v overlay | grep -v '/dev' | grep -v '/sys' | grep -v '/proc'
+      args:
+        executable: /bin/bash
+      register: fs_cmd_result
+      changed_when: false
+      failed_when: false
+
+    - name: Print any unowned files found
+      debug:
+        msg: "unowned files found: {{ fs_cmd_result.stdout }}"
+      changed_when: false
+      failed_when: true
+      when: fs_cmd_result.stdout
+  tags:
+    - check-unowned-files
+
+# Ensure no ungrouped files exist
+# Stop execution with failure if any exists
+# On containers it is common to have devices
+# under /dev without group
+- name: Ensure no ungrouped files exist
+  vars:
+    iscontainer: "{{ ansible_virtualization_type in ['docker','lxc'] }}"
+  block:
+    - name: Find any ungrouped files
+      shell: |
+        set -o pipefail
+        /usr/bin/df --local -P | grep -v '/run/user' |
+        /usr/bin/awk {' if (NR!=1) print $6'} | grep -v '/dev' | grep -v '/sys' |
+        {{ 'grep -vE ^/dev$ |' if iscontainer else '' }} /usr/bin/xargs -I '{}' find '{}' -xdev -nogroup |
+        grep -v overlay | grep -v '/dev' | grep -v '/sys' | grep -v '/proc'
+      args:
+        executable: /bin/bash
+      register: fs_cmd_result
+      changed_when: false
+      failed_when: false
+
+    - name: Print any ungrouped files found
+      debug:
+        msg: "ungrouped files found: {{ fs_cmd_result.stdout }}"
+      changed_when: false
+      failed_when: true
+      when: fs_cmd_result.stdout
+  tags:
+    - check-ungrouped-files
+
+# Will just show a list of SUID files
+# for the user to manually review
+- name: List SUID files
+  block:
+    - name: Find any SUID files
+      shell: |
+        set -o pipefail
+        df --local -P | grep -v '/run/user' | awk '{if (NR!=1) print $6}' |
+        xargs -I '{}' find '{}' -xdev -type f -perm -4000 2>/dev/null
+      args:
+        executable: /bin/bash
+      register: fs_cmd_result
+      changed_when: false
+      failed_when: false
+
+    - name: Print any SUID files found
+      debug:
+        msg: "SUID files found: {{ fs_cmd_result.stdout_lines }}"
+      changed_when: false
+      failed_when: false
+      when: fs_cmd_result.stdout
+  tags:
+    - show-suid-files
+
+# Will just show a list of SGID files
+# for the user to manually review
+- name: List SGID files
+  block:
+    - name: Find any SGID files
+      shell: |
+        set -o pipefail
+        df --local -P | grep -v /run/user | awk '{if (NR!=1) print $6}' |
+        xargs -I '{}' find '{}' -xdev -type f -perm -2000 2>/dev/null
+      args:
+        executable: /bin/bash
+      register: fs_cmd_result
+      changed_when: false
+      failed_when: false
+
+    - name: Print any SGID files found
+      debug:
+        msg: "SUID files found: {{ fs_cmd_result.stdout_lines }}"
+      changed_when: false
+      failed_when: false
+      when: fs_cmd_result.stdout
+  tags:
+    - show-sgid-files
