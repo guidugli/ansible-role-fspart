@@ -3,7 +3,7 @@
 - name: Validate partition input variables.
   vars:
     pathre: '^(?:[\/])$|^(?:[\/][a-zA-Z0-9_.-]+)+[\/]?$'
-  assert:
+  ansible.builtin.assert:
     quiet: yes
     that:
       - item.name is regex(pathre)  # Check if it is a directory
@@ -18,14 +18,14 @@
     label: "{{ item.name }}"
 
 - name: Validate fs_world_writeable_fix_enabled variable
-  assert:
+  ansible.builtin.assert:
     that:
       - fs_world_writeable_fix_enabled is defined
       - fs_world_writeable_fix_enabled | type_debug == 'bool'
     quiet: yes
 
 - name: Validate fs_fstrim_timer_enabled variable
-  assert:
+  ansible.builtin.assert:
     that:
       - fs_fstrim_timer_enabled is defined
       - fs_fstrim_timer_enabled | type_debug == 'bool'
@@ -34,7 +34,7 @@
 - name: "Validate crypttab variables: fspart_cryptkeys_path"
   vars:
     pathre: '^(?:[\/])$|^(?:[\/][a-zA-Z0-9_.-]+)+[\/]?$'
-  assert:
+  ansible.builtin.assert:
     that:
       - fspart_cryptkeys_path is string
       - fspart_cryptkeys_path is regex(pathre)
@@ -42,14 +42,14 @@
   when: fspart_cryptkeys_path is defined
 
 - name: "Validate crypttab variables: fspart_crypttab_entries"
-  assert:
+  ansible.builtin.assert:
     that:
       - fspart_crypttab_entries is sequence
     quiet: yes
   when: fspart_crypttab_entries is defined
 
 - name: "Validate list contents of fspart_crypttab_entries"
-  assert:
+  ansible.builtin.assert:
     that:
       - item.name is defined
       - item.name | type_debug is string
@@ -65,14 +65,14 @@
   loop: "{{ fspart_crypttab_entries | default([], true) }}"
 
 - name: "Validate crypttab variables: fspart_cryptkeys_files"
-  assert:
+  ansible.builtin.assert:
     that:
       - fspart_cryptkeys_files is sequence
     quiet: yes
   when: fspart_cryptkeys_files is defined
 
 - name: "Validate list contents of fspart_cryptkeys_files"
-  assert:
+  ansible.builtin.assert:
     that:
       - item.name is defined
       - item.name is string

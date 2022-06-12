@@ -35,7 +35,7 @@
   pre_tasks:
 
     - name: Create fstab file
-      file:
+      ansible.builtin.file:
         path: /etc/fstab
         state: touch
         modification_time: preserve
@@ -45,7 +45,7 @@
         group: root
 
     - name: update Ubuntu/Debian systems
-      apt:
+      ansible.builtin.apt:
 #        upgrade: dist
         update_cache: true
         cache_valid_time: 3600

@@ -19,7 +19,7 @@
 
 # Now just check each specified partitions exists (using shell commands)
 - name: 'Checking if all specified partitions exists (using shell commands)'
-  command: "findmnt -O '{{ item.validate_options | join(',') }}' {{ item['name'] }}"
+  ansible.builtin.command: "findmnt -O '{{ item.validate_options | join(',') }}' {{ item['name'] }}"
   register: fspart_partition_exists
   failed_when: fspart_partition_exists.rc != 0
   changed_when: false

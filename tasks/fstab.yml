@@ -7,11 +7,11 @@
 # are present, then stop execution with error.
 
 - name: Set variable to be used on notifications
-  set_fact:
+  ansible.builtin.set_fact:
     fspart_mount_point: "{{ item.name }}"
 
 - name: Check if entry already exists on fstab
-  command: >
+  ansible.builtin.command: >
     grep -E '^[^#].*?\s+{{ item.name }}\s+' /etc/fstab
   register: fstab_cmd_result
   failed_when: fstab_cmd_result.stderr | length > 0
@@ -20,7 +20,7 @@
 - name: If do not exist, create entry
   block:
     - name: Check if partition UUID was informed
-      assert:
+      ansible.builtin.assert:
         that:
           - item.src is defined
           - item.src | length > 0
@@ -29,10 +29,10 @@
         quiet: yes
 
     - name: Show item details
-      debug: var=item
+      ansible.builtin.debug: var=item
 
     - name: Create entry in fstab
-      mount:
+      ansible.builtin.mount:
         path: "{{ item.name }}"
         src: "{{ item.src }}"
         fstype: "{{ item.fstype }}"
@@ -46,13 +46,13 @@
     - name: Parse result into variables
       vars:
         fstab_cmd_result_split: "{{ fstab_cmd_result.stdout.split(' ') | reject('equalto','') | list }}"
-      set_fact:
+      ansible.builtin.set_fact:
         fstab_src: "{{ fstab_cmd_result_split[0] }}"
         fstab_fstype: "{{ fstab_cmd_result_split[2] }}"
         fstab_options: "{{ fstab_cmd_result_split[3] }}"
 
     - name: "Ensure {{ item.name }} options are correct"
-      mount:
+      ansible.builtin.mount:
         path: "{{ item.name }}"
         src: "{{ fstab_src }}"
         fstype: "{{ fstab_fstype }}"

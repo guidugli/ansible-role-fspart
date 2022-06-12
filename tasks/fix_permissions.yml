@@ -3,26 +3,26 @@
 - name: Review and fix file permissions under /var/log
   block:
     - name: Find if any file under /var/log need to have the permission fixed
-      command: >
+      ansible.builtin.command: >
         find /var/log -type f -perm /g=xw,o=rwx -ls -o -type d -perm /g=w,o=rwx -ls
       register: fs_cmd_result
       changed_when: false
 
     - name: Display result
-      debug:
+      ansible.builtin.debug:
         msg:
           - "------- FILES THAT WILL BE FIXED -------"
           - "{{ fs_cmd_result.stdout_lines }}"
           - "----------------------------------------"
 
     - name: Ensure permissions on all logfiles are configured
-      command: >
+      ansible.builtin.command: >
         find /var/log -type f -exec chmod g-wx,o-rwx "{}" + -o -type d -exec chmod g-w,o-rwx "{}" +
       changed_when: true
       when: fs_cmd_result.stdout | length > 0
 
     - name: Verify if the files were indeed corrected
-      command: >
+      ansible.builtin.command: >
         find /var/log -type f -perm /g=xw,o=rwx -ls -o -type d -perm /g=w,o=rwx -ls
       register: fs_cmd_result_fixed
       changed_when: false
@@ -35,7 +35,7 @@
 - name: Ensure no world writable files exist
   block:
     - name: Search for world writable files
-      shell: |
+      ansible.builtin.shell: |
         set -o pipefail
         df --local -P | grep -v '/run/user' | grep -v '/tmp' | grep -v '/dev' |
         awk '{if (NR!=1) print $6}' | xargs -I '{}' find '{}' -xdev -type f -perm -0002
@@ -45,14 +45,14 @@
       changed_when: false
 
     - name: Display result
-      debug:
+      ansible.builtin.debug:
         msg:
           - "------- FILES THAT CAN BE FIXED -------"
           - "{{ fs_cmd_result.stdout_lines }}"
           - "---------------------------------------"
 
     - name: Ensure files cannot be written by everyone
-      file:
+      ansible.builtin.file:
         path: "{{ item }}"
         mode: o-w
       when: (fs_cmd_result.stdout | length > 0) and fs_world_writeable_fix_enabled
@@ -66,7 +66,7 @@
 - name: Ensure no unowned files exist
   block:
     - name: Find any unowned files
-      shell: |
+      ansible.builtin.shell: |
         set -o pipefail
         /usr/bin/df --local -P | grep -v '/run/user' |
         /usr/bin/awk {' if (NR!=1) print $6'} | grep -v '/dev' | grep -v /sys |
@@ -79,7 +79,7 @@
       failed_when: false
 
     - name: Print any unowned files found
-      debug:
+      ansible.builtin.debug:
         msg: "unowned files found: {{ fs_cmd_result.stdout }}"
       changed_when: false
       failed_when: true
@@ -96,7 +96,7 @@
     iscontainer: "{{ ansible_virtualization_type in ['docker','lxc'] }}"
   block:
     - name: Find any ungrouped files
-      shell: |
+      ansible.builtin.shell: |
         set -o pipefail
         /usr/bin/df --local -P | grep -v '/run/user' |
         /usr/bin/awk {' if (NR!=1) print $6'} | grep -v '/dev' | grep -v '/sys' |
@@ -109,7 +109,7 @@
       failed_when: false
 
     - name: Print any ungrouped files found
-      debug:
+      ansible.builtin.debug:
         msg: "ungrouped files found: {{ fs_cmd_result.stdout }}"
       changed_when: false
       failed_when: true
@@ -122,7 +122,7 @@
 - name: List SUID files
   block:
     - name: Find any SUID files
-      shell: |
+      ansible.builtin.shell: |
         set -o pipefail
         df --local -P | grep -v '/run/user' | awk '{if (NR!=1) print $6}' |
         xargs -I '{}' find '{}' -xdev -type f -perm -4000 2>/dev/null
@@ -133,7 +133,7 @@
       failed_when: false
 
     - name: Print any SUID files found
-      debug:
+      ansible.builtin.debug:
         msg: "SUID files found: {{ fs_cmd_result.stdout_lines }}"
       changed_when: false
       failed_when: false
@@ -146,7 +146,7 @@
 - name: List SGID files
   block:
     - name: Find any SGID files
-      shell: |
+      ansible.builtin.shell: |
         set -o pipefail
         df --local -P | grep -v /run/user | awk '{if (NR!=1) print $6}' |
         xargs -I '{}' find '{}' -xdev -type f -perm -2000 2>/dev/null
@@ -157,7 +157,7 @@
       failed_when: false
 
     - name: Print any SGID files found
-      debug:
+      ansible.builtin.debug:
         msg: "SUID files found: {{ fs_cmd_result.stdout_lines }}"
       changed_when: false
       failed_when: false

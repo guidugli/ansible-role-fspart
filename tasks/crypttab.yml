@@ -3,7 +3,7 @@
 - name: "Create directory {{ crypt_path }}"
   vars:
     crypt_path: "{{ fspart_cryptkeys_path | default('/etc/cryptkeys', true) }}"
-  file:
+  ansible.builtin.file:
     path: "{{ crypt_path }}"
     owner: root
     group: root
@@ -13,7 +13,7 @@
     access_time: preserve
 
 - name: Copy file with owner and permissions
-  copy:
+  ansible.builtin.copy:
     src: "{{ item.src }}"
     dest: "{{ fspart_cryptkeys_path }}/{{ item.name }}"
     owner: root
@@ -23,7 +23,7 @@
   when: fspart_cryptkeys_files is defined
 
 - name: Set crypttab
-  crypttab:
+  ansible.builtin.crypttab:
     name: "{{ item.name }}"
     backing_device: "{{ item.backing_device }}"
     password: "{{ item.password }}"
@@ -35,7 +35,7 @@
 - name: Run systemd to load the crypttab entries
   vars:
     encoded: "{{ item.name | replace('-','\\x2d') }}"
-  systemd:
+  ansible.builtin.systemd:
     name: "systemd-cryptsetup@{{ encoded }}"
     state: started
     daemon_reload: yes
