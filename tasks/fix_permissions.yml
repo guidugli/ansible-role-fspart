@@ -92,14 +92,14 @@
 # under /dev without group
 - name: Ensure no ungrouped files exist
   vars:
-    iscontainer: "{{ ansible_virtualization_type in ['docker','lxc','containerd','container'] }}"
+    iscontainer: "{{ ansible_virtualization_type in ['docker', 'lxc', 'containerd', 'container'] }}"
   block:
     - name: Find any ungrouped files
       ansible.builtin.shell: |
         set -o pipefail
         /usr/bin/df --local -P | grep -v '/run/user' |
         /usr/bin/awk {' if (NR!=1) print $6'} | grep -v '/dev' | grep -v '/sys' |
-        {{ 'grep -vE ^/dev$ |' if iscontainer else '' }} /usr/bin/xargs -I '{}' find '{}' -xdev -nogroup |
+        {{ 'grep -vE ^/dev$ | ' if iscontainer else '' }} /usr/bin/xargs -I '{}' find '{}' -xdev -nogroup |
         grep -v overlay | grep -v '/dev' | grep -v '/sys' | grep -v '/proc'
       args:
         executable: /bin/bash
