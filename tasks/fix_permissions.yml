@@ -1,5 +1,4 @@
 ---
-
 - name: Review and fix file permissions under /var/log
   block:
     - name: Find if any file under /var/log need to have the permission fixed
@@ -93,7 +92,7 @@
 # under /dev without group
 - name: Ensure no ungrouped files exist
   vars:
-    iscontainer: "{{ ansible_virtualization_type in ['docker','lxc'] }}"
+    iscontainer: "{{ ansible_virtualization_type in ['docker','lxc','containerd','container'] }}"
   block:
     - name: Find any ungrouped files
       ansible.builtin.shell: |
