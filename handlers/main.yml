@@ -15,7 +15,7 @@
   when: fspart_unit_notify != 'tmp.mount'
 
 - name: Remount filesystem
-  ansible.builtin.mount:
+  ansible.posix.mount:
     path: "{{ fspart_mount_point }}"
     state: remounted
   ignore_errors: yes  # noqa ignore-errors

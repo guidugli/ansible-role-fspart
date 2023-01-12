@@ -50,7 +50,7 @@
 
     - name: Filter entries set to be excluded
       ansible.builtin.set_fact:
-        fs_filtered_result: '{{ fs_filtered_result|reject("match", item)|list }}'
+        fs_filtered_result: '{{ fs_filtered_result | reject("match", item) | list }}'
       loop: "{{ fs_world_writeable_excludes }}"
       when: fs_world_writeable_excludes is defined and (fs_world_writeable_excludes | length > 0)
 

@@ -1,3 +1,5 @@
 ---
 skip_list:
   - package-latest
+  - args[module]
+  - name[template]

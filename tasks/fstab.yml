@@ -30,10 +30,11 @@
         quiet: yes
 
     - name: Show item details
-      ansible.builtin.debug: var=item
+      ansible.builtin.debug:
+        var: item
 
     - name: Create entry in fstab
-      ansible.builtin.mount:
+      ansible.posix.mount:
         path: "{{ item.name }}"
         src: "{{ item.src }}"
         fstype: "{{ item.fstype }}"
@@ -45,14 +46,14 @@
   block:
     - name: Parse result into variables
       vars:
-        fstab_cmd_result_split: "{{ fstab_cmd_result.stdout.split(' ') | reject('equalto','') | list }}"
+        fstab_cmd_result_split: "{{ fstab_cmd_result.stdout.split(' ') | reject('equalto', '') | list }}"
       ansible.builtin.set_fact:
         fstab_src: "{{ fstab_cmd_result_split[0] }}"
         fstab_fstype: "{{ fstab_cmd_result_split[2] }}"
         fstab_options: "{{ fstab_cmd_result_split[3] }}"
 
-    - name: "Ensure {{ item.name }} options are correct"
-      ansible.builtin.mount:
+    - name: "Ensure mount options are correct for {{ item.name }}"
+      ansible.posix.mount:
         path: "{{ item.name }}"
         src: "{{ fstab_src }}"
         fstype: "{{ fstab_fstype }}"

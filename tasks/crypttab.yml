@@ -23,7 +23,7 @@
   when: fspart_cryptkeys_files is defined
 
 - name: Set crypttab
-  ansible.builtin.crypttab:
+  community.general.crypttab:
     name: "{{ item.name }}"
     backing_device: "{{ item.backing_device }}"
     password: "{{ item.password }}"
@@ -34,7 +34,7 @@
 
 - name: Run systemd to load the crypttab entries
   vars:
-    encoded: "{{ item.name | replace('-','\\x2d') }}"
+    encoded: "{{ item.name | replace('-', '\\x2d') }}"
   ansible.builtin.systemd:
     name: "systemd-cryptsetup@{{ encoded }}"
     state: started

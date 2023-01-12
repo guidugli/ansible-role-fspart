@@ -84,7 +84,7 @@
     # Only found this problem on tmp.mount of Fedora 33 but it does not hurt
     # to check on every platform
     - name: "Add missing install section (if needed) for {{ item.unit_name }}"
-      ansible.builtin.ini_file:
+      community.general.ini_file:
         path: '{{ fspart_systemd_etc_path }}/{{ item.unit_name }}'
         section: Install
         option: WantedBy

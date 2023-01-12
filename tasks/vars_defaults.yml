@@ -17,7 +17,7 @@
       validate_options: "{{ item.validate_options | default([]) }}"
       autofix: "{{ item.autofix | default(false) }}"
       unit_name: "{{ item.unit_name | default('no_unit_name') }}"
-    tmprec2: "{{ (tmprec | combine({ 'src': item.src })) if item.src is defined else tmprec }}"
+    tmprec2: "{{ (tmprec | combine({'src': item.src})) if item.src is defined else tmprec }}"
     tmprec3: "{{ (tmprec2 | combine({ 'fstype': item.fstype })) if item.fstype is defined else tmprec2 }}"
   ansible.builtin.set_fact:
     fspart_process_input_var: >
