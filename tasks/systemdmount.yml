@@ -41,6 +41,7 @@
   # If not exist on etc path, try to copy unit first from ansible controller
   # then try to copy from systemd locations
 - name: "Copy {{ item.unit_name }} from source locations to {{ fspart_systemd_etc_path }}"
+  when: fspart_systemd_unit_path != fspart_systemd_etc_path + '/' + item.unit_name
   block:
 
     # First try to copy the unit file from controller
@@ -55,7 +56,7 @@
         remote_src: no
       ignore_errors: yes
       no_log: yes
-      notify: reload systemd configuration
+      notify: Reload systemd configuration
       register: fspart_copy_result
 
     - name: Fail if unit do not exist on ansible controller or on remote host
@@ -74,10 +75,8 @@
         group: root
         mode: '0644'
         remote_src: yes
-      notify: reload systemd configuration
+      notify: Reload systemd configuration
       when: fspart_systemd_unit_found and fspart_copy_result is failed
-
-  when: fspart_systemd_unit_path != fspart_systemd_etc_path + '/' + item.unit_name
 
 - name: "Fix values in {{ fspart_systemd_etc_path }}/{{ item.unit_name }} if required"
   block:
@@ -93,9 +92,9 @@
         no_extra_spaces: yes
         mode: '0644'
       notify:
-        - reload systemd configuration
-        - restart systemd unit
-        - reboot
+        - Reload systemd configuration
+        - Restart systemd unit
+        - Reboot
 
     - name: "Configure config file options for unit {{ item.unit_name }}"
       ansible.builtin.lineinfile:
@@ -104,9 +103,9 @@
         line: "{{ 'Options=' + (item['mount_options'] | join(',')) }}"
         state: present
       notify:
-        - reload systemd configuration
-        - restart systemd unit
-        - reboot
+        - Reload systemd configuration
+        - Restart systemd unit
+        - Reboot
 
 - name: Force systemd to reload in order to enable it to notice the changes
   ansible.builtin.meta: flush_handlers

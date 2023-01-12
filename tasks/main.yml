@@ -13,7 +13,7 @@
     state: present
   when: fs_fstrim_timer_enabled
 
-- name: enable fstrim service
+- name: Enable fstrim service
   ansible.builtin.systemd:
     name: fstrim.timer
     enabled: yes

@@ -1,9 +1,11 @@
 ---
 - name: Review and fix file permissions under /var/log
+  tags:
+    - var-log-perm-fix
   block:
     - name: Find if any file under /var/log need to have the permission fixed
       ansible.builtin.command: >
-        find /var/log -type f -perm /g=xw,o=rwx -ls -o -type d -perm /g=w,o=rwx -ls
+        find /var/log -type f -perm /g=xw,o=rwx -ls -o -type d -perm /g=w,o=wx -ls
       register: fs_cmd_result
       changed_when: false
 
@@ -28,10 +30,9 @@
       failed_when: fs_cmd_result_fixed.stdout | length > 0 or fs_cmd_result_fixed.rc != 0
       when: fs_cmd_result.stdout | length > 0
 
-  tags:
-    - var-log-perm-fix
-
 - name: Ensure no world writable files exist
+  tags:
+    - world-writable-fix
   block:
     - name: Search for world writable files
       ansible.builtin.shell: |
@@ -43,26 +44,36 @@
       register: fs_cmd_result
       changed_when: false
 
+    - name: Copy variable
+      ansible.builtin.set_fact:
+        fs_filtered_result: "{{ fs_cmd_result.stdout_lines }}"
+
+    - name: Filter entries set to be excluded
+      ansible.builtin.set_fact:
+        fs_filtered_result: '{{ fs_filtered_result|reject("match", item)|list }}'
+      loop: "{{ fs_world_writeable_excludes }}"
+      when: fs_world_writeable_excludes is defined and (fs_world_writeable_excludes | length > 0)
+
+
     - name: Display result
       ansible.builtin.debug:
         msg:
           - "------- FILES THAT CAN BE FIXED -------"
-          - "{{ fs_cmd_result.stdout_lines }}"
+          - "{{ fs_filtered_result }}"
           - "---------------------------------------"
 
     - name: Ensure files cannot be written by everyone
       ansible.builtin.file:
         path: "{{ item }}"
         mode: o-w
-      when: (fs_cmd_result.stdout | length > 0) and fs_world_writeable_fix_enabled
-      loop: "{{ fs_cmd_result.stdout_lines }}"
-
-  tags:
-    - world-writable-fix
+      when: (fs_filtered_result | length > 0) and fs_world_writeable_fix_enabled
+      loop: "{{ fs_filtered_result }}"
 
 # Ensure no unowned files exist
 # Stop execution with failure if any exists
 - name: Ensure no unowned files exist
+  tags:
+    - check-unowned-files
   block:
     - name: Find any unowned files
       ansible.builtin.shell: |
@@ -70,7 +81,8 @@
         /usr/bin/df --local -P | grep -v '/run/user' |
         /usr/bin/awk {' if (NR!=1) print $6'} | grep -v '/dev' | grep -v /sys |
         /usr/bin/xargs -I '{}' find '{}' -xdev -nouser |
-        grep -v overlay | grep -v '/dev' | grep -v '/sys' | grep -v '/proc'
+        grep -v overlay | grep -v '/dev' | grep -v '/sys' | grep -v '/proc' |
+        grep -v '/opt/var/lib/containers' | grep -v .local/share/containers
       args:
         executable: /bin/bash
       register: fs_cmd_result
@@ -83,8 +95,6 @@
       changed_when: false
       failed_when: true
       when: fs_cmd_result.stdout
-  tags:
-    - check-unowned-files
 
 # Ensure no ungrouped files exist
 # Stop execution with failure if any exists
@@ -93,6 +103,8 @@
 - name: Ensure no ungrouped files exist
   vars:
     iscontainer: "{{ ansible_virtualization_type in ['docker', 'lxc', 'containerd', 'container'] }}"
+  tags:
+    - check-ungrouped-files
   block:
     - name: Find any ungrouped files
       ansible.builtin.shell: |
@@ -113,12 +125,12 @@
       changed_when: false
       failed_when: true
       when: fs_cmd_result.stdout
-  tags:
-    - check-ungrouped-files
 
 # Will just show a list of SUID files
 # for the user to manually review
 - name: List SUID files
+  tags:
+    - show-suid-files
   block:
     - name: Find any SUID files
       ansible.builtin.shell: |
@@ -137,12 +149,12 @@
       changed_when: false
       failed_when: false
       when: fs_cmd_result.stdout
-  tags:
-    - show-suid-files
 
 # Will just show a list of SGID files
 # for the user to manually review
 - name: List SGID files
+  tags:
+    - show-sgid-files
   block:
     - name: Find any SGID files
       ansible.builtin.shell: |
@@ -161,5 +173,3 @@
       changed_when: false
       failed_when: false
       when: fs_cmd_result.stdout
-  tags:
-    - show-sgid-files

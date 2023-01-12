@@ -18,6 +18,7 @@
   changed_when: false
 
 - name: If do not exist, create entry
+  when: fstab_cmd_result.stdout | length == 0
   block:
     - name: Check if partition UUID was informed
       ansible.builtin.assert:
@@ -39,9 +40,8 @@
         opts: "{{ item.mount_options | join(',') }}"
         state: "{{ item.mount_state | default('mounted') }}"
 
-  when: fstab_cmd_result.stdout | length == 0
-
 - name: Entry exists, check options
+  when: fstab_cmd_result.stdout | length > 0
   block:
     - name: Parse result into variables
       vars:
@@ -58,5 +58,3 @@
         fstype: "{{ fstab_fstype }}"
         opts: "{{ item.mount_options | join(',') }}"
         state: mounted
-
-  when: fstab_cmd_result.stdout | length > 0

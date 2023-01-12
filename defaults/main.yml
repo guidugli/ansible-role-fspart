@@ -5,8 +5,17 @@
 # file that can be written by everyone (others).
 fs_world_writeable_fix_enabled: yes
 
+# Specify which directories to exclude from the result
+# Only works if fs_world_writeable_fix_enabled is true
+#fs_world_writeable_excludes:
+#  - /opt/var/log
+#  - /opt/var/spool
+
 # If set to true, fstrim.timer will be enabled and started
 fs_fstrim_timer_enabled: yes
+
+# Disable auto mount
+fs_disable_automount: yes
 
 #### CRYPTTAB ####
 
