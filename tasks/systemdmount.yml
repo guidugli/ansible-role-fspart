@@ -32,7 +32,8 @@
   ansible.builtin.set_fact:
     fspart_systemd_unit_path: "{{ (fspart_unit_location.results | selectattr('rc', 'equalto', 0) |
                               first).fileitem | default('not found') }}"
-    fspart_systemd_unit_found: "{{ (fspart_unit_location.results | selectattr('rc', 'equalto', 0) | first) is defined  }}"
+    fspart_systemd_unit_found: "{{ (fspart_unit_location.results | selectattr('rc', 'equalto', 0) |
+                              first) is defined  }}"
 
 - name: "Result:"
   ansible.builtin.debug:
