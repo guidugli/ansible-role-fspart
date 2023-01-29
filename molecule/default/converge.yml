@@ -4,6 +4,13 @@
   vars:
     fs_world_writeable_fix_enabled: yes
     partitions:
+      - name: /opt/test
+        options: ['nodev', 'nosuid', 'noexec']
+        unit_name: fstab
+        mount_options: ['strictatime', 'nodev', 'nosuid', 'noexec']
+        src: 'tmpfs'
+        fstype: tmpfs
+        autofix: yes
       - name: /tmp
         unit_name: tmp.mount
         mount_options: ['mode=1777', 'strictatime', 'nodev', 'nosuid', 'noexec']
