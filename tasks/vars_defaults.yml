@@ -21,7 +21,7 @@
     tmprec3: "{{ (tmprec2 | combine({'fstype': item.fstype})) if item.fstype is defined else tmprec2 }}"
   ansible.builtin.set_fact:
     fspart_process_input_var: >
-      {{ fspart_process_input_var | default([]) + [ tmprec3 ] }}
+      {{ fspart_process_input_var | default([]) + [tmprec3] }}
   loop: "{{ partitions }}"
 
 # now overwrite partitions variable with the processed data
