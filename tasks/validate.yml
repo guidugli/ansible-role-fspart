@@ -28,4 +28,4 @@
   loop: "{{ partitions }}"
   when: item.validate_options is defined
   loop_control:
-    label: "Partition: {{ item.name }}, Mount options: {{ item.validate_options | join(',') }}"
+    label: "Partition: {{ item.name }}, Mount options: {{ item.validate_options | default([]) | join(',') }}"
