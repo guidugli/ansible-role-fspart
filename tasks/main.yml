@@ -24,7 +24,7 @@
 
 - name: Check systemd unit files for each partition with autofix set to true (unit_name != fstab)
   ansible.builtin.include_tasks: systemdmount.yml
-  loop: "{{ partitions | selectattr('autofix') | rejectattr('unit_name','equalto','fstab') | list }}"
+  loop: "{{ partitions | selectattr('autofix') | rejectattr('unit_name', 'equalto', 'fstab') | list }}"
 
 - name: Check fstab file for each partition with autofix set to true (unit_name == fstab)
   ansible.builtin.include_tasks: fstab.yml
