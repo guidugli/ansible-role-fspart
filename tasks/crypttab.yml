@@ -40,4 +40,6 @@
     state: started
     daemon_reload: yes
   loop: "{{ fspart_crypttab_entries }}"
-  when: fspart_crypttab_entries is defined
+  when:
+    - fspart_crypttab_entries is defined
+    - item.password != 'none'
