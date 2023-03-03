@@ -1,7 +1,7 @@
 Ansible Role: fspart
 =========
 
-An Ansible Role that configure partitions on RHEL/CentOS, Fedora and Debian/Ubuntu. This role also perform security checks on filesystems.
+An Ansible Role that configure partitions on RHEL/CentOS, Fedora and Debian/Ubuntu. This role also perform security checks on filesystems (based on CIS recommendations).
 
 
 Requirements
@@ -14,13 +14,50 @@ Role Variables
 
 **Available variables are listed below, along with default values (see defaults/main.yml):**
 
+    fs_run_fix_permissions: yes
+
+If set to yes, it will run all filesystem permission and ownership checking and repairing.
+
     fs_world_writeable_fix_enabled: yes
 
-If set to true, the role will fix any file that can be written by everyone (others).
+If set to yes, the role will fix any file that can be written by everyone (others).
+
+    fs_log_files_fix_enabled: yes
+
+If set to yes, it will fix any file under /var/log that can be read/written by others, or that can be written by group.
+
+    fs_unowned_detection_enabled: yes
+
+If set to yes, it will stop the execution with an error if it finds files without owners. This only works if fs_run_fix_permissions is set to true.
+
+    fs_ungrouped_detection_enabled: yes
+
+If set to try, it will stop the execution with an error if it finds files without group. Only works if fs_run_fix_permissions is set to true.
+
+    #fs_world_writeable_excludes:
+    #  - /opt/var/log
+    #  - /opt/var/spool
+
+Specify which directories to exclude from the result.
+
+    #fspart_log_exception:
+    #  - /var/log
+    #  - /var/log/gdm
+    #  - /var/log/journal
+    #  - /var/log/btmp
+    #  - /var/log/journal/9ac3b4eccf62428bb4ae3d755c53b793
+    #  - /var/log/lastlog
+    #  - /var/log/wtmp
+
+List the log files to to be disconsidered when removing permissions. Log files should not allow any access to others and should not allow group to write to the file.
 
     fs_fstrim_timer_enabled: yes
 
-If set to true, fstrim.timer will be enabled and started
+If set to true, fstrim.timer will be enabled and started.
+
+    fs_disable_automount: yes
+
+If yes, disable automount.
 
     #fspart_cryptkeys_path: /etc/cryptkeys
 

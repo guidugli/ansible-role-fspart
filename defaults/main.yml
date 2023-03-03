@@ -1,15 +1,48 @@
 ---
 # defaults file for fspart
 
+#### PERMISSION CHECKING ####
+
+# If set to true, it will run all filesystem permission and
+# ownership checking and repairing.
+fs_run_fix_permissions: true
+
 # If set to true, the role will fix any
 # file that can be written by everyone (others).
+# Only works if fs_run_fix_permissions is set to true
 fs_world_writeable_fix_enabled: yes
+
+# If set to true, it will fix any file under /var/log
+# that can be read/written by others, or that can be
+# written by group.
+# Only works if fs_run_fix_permissions is set to true
+fs_log_files_fix_enabled: yes
+
+# If set to try, it will stop the execution with an error
+# if it finds files without owners
+# Only works if fs_run_fix_permissions is set to true
+fs_unowned_detection_enabled: yes
+
+# If set to try, it will stop the execution with an error
+# if it finds files without group
+# Only works if fs_run_fix_permissions is set to true
+fs_ungrouped_detection_enabled: yes
 
 # Specify which directories to exclude from the result
 # Only works if fs_world_writeable_fix_enabled is true
 #fs_world_writeable_excludes:
 #  - /opt/var/log
 #  - /opt/var/spool
+
+# List the log files to ignore when removing permissions g-wx and o-rwx
+#fspart_log_exception:
+#  - /var/log
+#  - /var/log/gdm
+#  - /var/log/journal
+#  - /var/log/btmp
+#  - /var/log/journal/9ac3b4eccf62428bb4ae3d755c53b793
+#  - /var/log/lastlog
+#  - /var/log/wtmp
 
 # If set to true, fstrim.timer will be enabled and started
 fs_fstrim_timer_enabled: yes
@@ -87,15 +120,3 @@ fs_disable_automount: yes
 # Sometimes partitions cannot be mounted because they
 # are busy (have other system components using it).
 fspart_allow_reboot: yes
-
-# List the log files to ignore when removing permissions g-wx and o-rwx
-# and directories with permission g-w and o-rwx
-# Not implemented yet
-#fspart_log_exception:
-#  - /var/log
-#  - /var/log/gdm
-#  - /var/log/journal
-#  - /var/log/btmp
-#  - /var/log/journal/9ac3b4eccf62428bb4ae3d755c53b793
-#  - /var/log/lastlog
-#  - /var/log/wtmp

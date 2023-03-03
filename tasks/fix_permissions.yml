@@ -5,30 +5,67 @@
   block:
     - name: Find if any file under /var/log need to have the permission fixed
       ansible.builtin.command: >
-        find /var/log -type f -perm /g=xw,o=rwx -ls -o -type d -perm /g=w,o=wx -ls
+        find /var/log -type f -perm /g=xw,o=rwx -o -type d -perm /g=w,o=wx -print
       register: fs_cmd_result
       changed_when: false
+
+    - name: Copy variable
+      ansible.builtin.set_fact:
+        fs_filtered_result: "{{ fs_cmd_result.stdout_lines }}"
+
+    - name: Filter entries set to be excluded
+      ansible.builtin.set_fact:
+        fs_filtered_result: '{{ fs_filtered_result | reject("match", item) | list }}'
+      loop: "{{ fspart_log_exception }}"
+      when: fspart_log_exception is defined and (fspart_log_exception | length > 0)
 
     - name: Display result
       ansible.builtin.debug:
         msg:
           - "------- FILES THAT WILL BE FIXED -------"
-          - "{{ fs_cmd_result.stdout_lines }}"
+          - "{{ fs_filtered_result }}"
           - "----------------------------------------"
 
-    - name: Ensure permissions on all logfiles are configured
-      ansible.builtin.command: >
-        find /var/log -type f -exec chmod g-wx,o-rwx "{}" + -o -type d -exec chmod g-w,o-rwx "{}" +
-      changed_when: true
-      when: fs_cmd_result.stdout | length > 0
+    - name: Ensure log files permissions are correct (no access to others, group can only read)
+      ansible.builtin.file:
+        path: "{{ item }}"
+        mode: o-rwx,g-w
+      when:
+        - fs_filtered_result | length > 0
+        - fs_log_files_fix_enabled
+      loop: "{{ fs_filtered_result }}"
 
-    - name: Verify if the files were indeed corrected
+    - name: Re-run scan to check if problems were fixed
       ansible.builtin.command: >
-        find /var/log -type f -perm /g=xw,o=rwx -ls -o -type d -perm /g=w,o=rwx -ls
+        find /var/log -type f -perm /g=xw,o=rwx -o -type d -perm /g=w,o=rwx -print
       register: fs_cmd_result_fixed
       changed_when: false
+      when:
+        - fs_log_files_fix_enabled
+
+    - name: Copy variable
+      ansible.builtin.set_fact:
+        fs_filtered_result: "{{ fs_cmd_result_fixed.stdout_lines }}"
+
+    - name: Filter entries set to be excluded
+      ansible.builtin.set_fact:
+        fs_filtered_result: '{{ fs_filtered_result | reject("match", item) | list }}'
+      loop: "{{ fspart_log_exception }}"
+      when:
+        - fspart_log_exception is defined
+        - fspart_log_exception | length > 0
+        - fs_log_files_fix_enabled
+
+    - name: Display Final Result
+      ansible.builtin.debug:
+        msg:
+          - "------- FINAL RESULT AFTER ATTEMPT FIX -------"
+          - "{{ fs_filtered_result }}"
+          - "----------------------------------------"
       failed_when: fs_cmd_result_fixed.stdout | length > 0 or fs_cmd_result_fixed.rc != 0
-      when: fs_cmd_result.stdout | length > 0
+      when:
+        - fs_filtered_result | length > 0
+        - fs_log_files_fix_enabled
 
 - name: Ensure no world writable files exist
   tags:
@@ -53,7 +90,6 @@
         fs_filtered_result: '{{ fs_filtered_result | reject("match", item) | list }}'
       loop: "{{ fs_world_writeable_excludes }}"
       when: fs_world_writeable_excludes is defined and (fs_world_writeable_excludes | length > 0)
-
 
     - name: Display result
       ansible.builtin.debug:
@@ -94,7 +130,9 @@
         msg: "unowned files found: {{ fs_cmd_result.stdout }}"
       changed_when: false
       failed_when: true
-      when: fs_cmd_result.stdout
+      when:
+        - fs_cmd_result.stdout
+        - fs_unowned_detection_enabled
 
 # Ensure no ungrouped files exist
 # Stop execution with failure if any exists
@@ -124,7 +162,9 @@
         msg: "ungrouped files found: {{ fs_cmd_result.stdout }}"
       changed_when: false
       failed_when: true
-      when: fs_cmd_result.stdout
+      when:
+        - fs_cmd_result.stdout
+        - fs_ungrouped_detection_enabled
 
 # Will just show a list of SUID files
 # for the user to manually review

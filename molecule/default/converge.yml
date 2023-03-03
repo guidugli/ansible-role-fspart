@@ -31,7 +31,6 @@
         autofix: yes
     fspart_allow_reboot: false
     fspart_log_exception:
-      - /var/log
       - /var/log/gdm
       - /var/log/journal
       - /var/log/btmp

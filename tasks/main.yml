@@ -35,3 +35,4 @@
 
 - name: Fix filesystems permissions
   ansible.builtin.import_tasks: fix_permissions.yml
+  when: fs_run_fix_permissions | default(true)
