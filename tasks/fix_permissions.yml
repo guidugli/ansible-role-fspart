@@ -35,37 +35,40 @@
         - fs_log_files_fix_enabled
       loop: "{{ fs_filtered_result }}"
 
-    - name: Re-run scan to check if problems were fixed
-      ansible.builtin.command: >
-        find /var/log -type f -perm /g=xw,o=rwx -o -type d -perm /g=w,o=rwx -print
-      register: fs_cmd_result_fixed
-      changed_when: false
-      when:
-        - fs_log_files_fix_enabled
+#Not doing this on the other sections, so to be consistent, commenting this
+#    - name: Re-run scan to check if problems were fixed
+#      ansible.builtin.command: >
+#        find /var/log -type f -perm /g=xw,o=rwx -o -type d -perm /g=w,o=rwx -print
+#      register: fs_cmd_result_fixed
+#      changed_when: false
+#      when:
+#        - fs_log_files_fix_enabled
 
-    - name: Copy variable
-      ansible.builtin.set_fact:
-        fs_filtered_result: "{{ fs_cmd_result_fixed.stdout_lines }}"
+#    - name: Copy variable
+#      ansible.builtin.set_fact:
+#        fs_filtered_result: "{{ fs_cmd_result_fixed.stdout_lines }}"
+#      when:
+#        - fs_log_files_fix_enabled
 
-    - name: Filter entries set to be excluded
-      ansible.builtin.set_fact:
-        fs_filtered_result: '{{ fs_filtered_result | reject("match", item) | list }}'
-      loop: "{{ fspart_log_exception }}"
-      when:
-        - fspart_log_exception is defined
-        - fspart_log_exception | length > 0
-        - fs_log_files_fix_enabled
-
-    - name: Display Final Result
-      ansible.builtin.debug:
-        msg:
-          - "------- FINAL RESULT AFTER ATTEMPT FIX -------"
-          - "{{ fs_filtered_result }}"
-          - "----------------------------------------"
-      failed_when: fs_cmd_result_fixed.stdout | length > 0 or fs_cmd_result_fixed.rc != 0
-      when:
-        - fs_filtered_result | length > 0
-        - fs_log_files_fix_enabled
+#    - name: Filter entries set to be excluded
+#      ansible.builtin.set_fact:
+#        fs_filtered_result: '{{ fs_filtered_result | reject("match", item) | list }}'
+#      loop: "{{ fspart_log_exception }}"
+#      when:
+#        - fspart_log_exception is defined
+#        - fspart_log_exception | length > 0
+#        - fs_log_files_fix_enabled
+#
+#    - name: Display Final Result
+#      ansible.builtin.debug:
+#        msg:
+#          - "------- FINAL RESULT AFTER ATTEMPT FIX -------"
+#          - "{{ fs_filtered_result }}"
+#          - "----------------------------------------"
+#      failed_when: fs_cmd_result_fixed.stdout | length > 0 or fs_cmd_result_fixed.rc != 0
+#      when:
+#        - fs_filtered_result | length > 0
+#        - fs_log_files_fix_enabled
 
 - name: Ensure no world writable files exist
   tags:
@@ -127,12 +130,18 @@
 
     - name: Print any unowned files found
       ansible.builtin.debug:
-        msg: "unowned files found: {{ fs_cmd_result.stdout }}"
+        msg:
+          - "------- UNOWNED FILES FOUND -------"
+          - "{{ fs_cmd_result.stdout_lines }}"
+          - "---------------------------------------"
       changed_when: false
-      failed_when: true
-      when:
-        - fs_cmd_result.stdout
-        - fs_unowned_detection_enabled
+      failed_when: false
+      when: fs_cmd_result.stdout
+
+    - name: Unowned files found
+      ansible.builtin.fail:
+        msg: Unowned files found
+      when: fs_unowned_detection_enabled
 
 # Ensure no ungrouped files exist
 # Stop execution with failure if any exists
@@ -159,12 +168,18 @@
 
     - name: Print any ungrouped files found
       ansible.builtin.debug:
-        msg: "ungrouped files found: {{ fs_cmd_result.stdout }}"
+        msg:
+          - "------- UNGROUPED FILES FOUND -------"
+          - "{{ fs_cmd_result.stdout_lines }}"
+          - "---------------------------------------"
       changed_when: false
-      failed_when: true
-      when:
-        - fs_cmd_result.stdout
-        - fs_ungrouped_detection_enabled
+      failed_when: false
+      when: fs_cmd_result.stdout
+
+    - name: Ungrouped files found
+      ansible.builtin.fail:
+        msg: Ungrouped files found
+      when: fs_ungrouped_detection_enabled
 
 # Will just show a list of SUID files
 # for the user to manually review
@@ -185,7 +200,10 @@
 
     - name: Print any SUID files found
       ansible.builtin.debug:
-        msg: "SUID files found: {{ fs_cmd_result.stdout_lines }}"
+        msg:
+          - "------- SUID FILES FOUND -------"
+          - "{{ fs_cmd_result.stdout_lines }}"
+          - "---------------------------------------"
       changed_when: false
       failed_when: false
       when: fs_cmd_result.stdout
@@ -209,7 +227,10 @@
 
     - name: Print any SGID files found
       ansible.builtin.debug:
-        msg: "SUID files found: {{ fs_cmd_result.stdout_lines }}"
+        msg:
+          - "------- SGID FILES FOUND -------"
+          - "{{ fs_cmd_result.stdout_lines }}"
+          - "---------------------------------------"
       changed_when: false
       failed_when: false
       when: fs_cmd_result.stdout
