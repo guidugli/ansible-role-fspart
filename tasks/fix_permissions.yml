@@ -136,12 +136,14 @@
           - "---------------------------------------"
       changed_when: false
       failed_when: false
-      when: fs_cmd_result.stdout
+      when: fs_cmd_result.stdout | length > 0
 
     - name: Unowned files found
       ansible.builtin.fail:
         msg: Unowned files found
-      when: fs_unowned_detection_enabled
+      when:
+        - fs_unowned_detection_enabled
+        - fs_cmd_result.stdout | length > 0
 
 # Ensure no ungrouped files exist
 # Stop execution with failure if any exists
@@ -174,12 +176,14 @@
           - "---------------------------------------"
       changed_when: false
       failed_when: false
-      when: fs_cmd_result.stdout
+      when: fs_cmd_result.stdout | length > 0
 
     - name: Ungrouped files found
       ansible.builtin.fail:
         msg: Ungrouped files found
-      when: fs_ungrouped_detection_enabled
+      when:
+        - fs_ungrouped_detection_enabled
+        - fs_cmd_result.stdout | length > 0
 
 # Will just show a list of SUID files
 # for the user to manually review
@@ -206,7 +210,7 @@
           - "---------------------------------------"
       changed_when: false
       failed_when: false
-      when: fs_cmd_result.stdout
+      when: fs_cmd_result.stdout | length > 0
 
 # Will just show a list of SGID files
 # for the user to manually review
@@ -233,4 +237,4 @@
           - "---------------------------------------"
       changed_when: false
       failed_when: false
-      when: fs_cmd_result.stdout
+      when: fs_cmd_result.stdout | length > 0
