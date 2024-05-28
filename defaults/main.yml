@@ -10,23 +10,23 @@ fs_run_fix_permissions: true
 # If set to true, the role will fix any
 # file that can be written by everyone (others).
 # Only works if fs_run_fix_permissions is set to true
-fs_world_writeable_fix_enabled: yes
+fs_world_writeable_fix_enabled: false
 
 # If set to true, it will fix any file under /var/log
 # that can be read/written by others, or that can be
 # written by group.
 # Only works if fs_run_fix_permissions is set to true
-fs_log_files_fix_enabled: yes
+fs_log_files_fix_enabled: false
 
 # If set to try, it will stop the execution with an error
 # if it finds files without owners
 # Only works if fs_run_fix_permissions is set to true
-fs_unowned_detection_enabled: yes
+fs_unowned_detection_enabled: false
 
 # If set to try, it will stop the execution with an error
 # if it finds files without group
 # Only works if fs_run_fix_permissions is set to true
-fs_ungrouped_detection_enabled: yes
+fs_ungrouped_detection_enabled: false
 
 # Specify which directories to exclude from the result
 # Only works if fs_world_writeable_fix_enabled is true

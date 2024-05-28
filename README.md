@@ -18,19 +18,19 @@ Role Variables
 
 If set to yes, it will run all filesystem permission and ownership checking and repairing.
 
-    fs_world_writeable_fix_enabled: yes
+    fs_world_writeable_fix_enabled: false
 
 If set to yes, the role will fix any file that can be written by everyone (others).
 
-    fs_log_files_fix_enabled: yes
+    fs_log_files_fix_enabled: false
 
 If set to yes, it will fix any file under /var/log that can be read/written by others, or that can be written by group.
 
-    fs_unowned_detection_enabled: yes
+    fs_unowned_detection_enabled: false
 
 If set to yes, it will stop the execution with an error if it finds files without owners. This only works if fs_run_fix_permissions is set to true.
 
-    fs_ungrouped_detection_enabled: yes
+    fs_ungrouped_detection_enabled: false
 
 If set to try, it will stop the execution with an error if it finds files without group. Only works if fs_run_fix_permissions is set to true.
 
