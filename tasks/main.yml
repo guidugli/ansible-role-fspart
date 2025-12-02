@@ -11,6 +11,8 @@
       ansible.builtin.import_tasks: asserts.yml
     
     - name: Install fstrim.timer if not present
+      become: yes
+      become_user: root
       ansible.builtin.package:
         name: util-linux
         state: present
