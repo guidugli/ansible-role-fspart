@@ -3,10 +3,12 @@
 
 # Reload daemon if any unit added or changed on disk
 - name: Reload systemd configuration
+  become: yes
   ansible.builtin.systemd:
     daemon_reload: yes
 
 - name: Restart systemd unit
+  become: yes
   ansible.builtin.systemd:
     name: "{{ fspart_unit_notify }}"
     enabled: yes
@@ -15,12 +17,14 @@
   when: fspart_unit_notify != 'tmp.mount'
 
 - name: Remount filesystem
+  become: yes
   ansible.posix.mount:
     path: "{{ fspart_mount_point }}"
     state: remounted
   ignore_errors: yes  # noqa ignore-errors
 
 - name: Reboot
+  become: yes
   ansible.builtin.reboot:
     msg: "Reboot initiated by Ansible for updates"
     connect_timeout: 5
