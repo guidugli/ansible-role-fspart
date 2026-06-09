@@ -1,0 +1,10 @@
+---
+collections:
+  - name: containers.podman
+    version: ">=1.10.0"
+
+  - name: ansible.posix
+    version: ">=2.2.0"
+
+  - name: community.general
+    version: ">=11.0.0"

@@ -1,112 +1,131 @@
 ---
-# Tasks to setup or maintain systemd mount units
-# It is on a specific file so it can work with a loop
-
-# Autofix will check and adjust configuration files so the filesystem
-# is mounted properly. If the unit cannot be found in /etc/systemd/system,
-# the role will attempt to copy a local file with same unit name from
-# role's file directory, to the target system. If a local file with the
-# unit name is found locally on role's file directory, it will try to copy \
-# it from /lib/systemd/system.
-# NOTE: files on /etc/systemd/system will NOT be overwritten
-
-- name: Set variable to be used on notifications
+- name: Track unit and mount point used by handlers
   ansible.builtin.set_fact:
     fspart_unit_notify: "{{ item.unit_name }}"
+    fspart_mount_point: "{{ item.name }}"
+  tags:
+    - facts
 
-- name: "Check if {{ item.unit_name }} exists on known systemd locations"
-  ansible.builtin.raw: "test -e {{ fileitem }}"
+- name: Check known remote systemd unit paths
+  ansible.builtin.stat:
+    path: "{{ fileitem }}"
   register: fspart_unit_location
-  changed_when: false
-  ignore_errors: yes
   loop:
     - "{{ fspart_systemd_etc_path }}/{{ item.unit_name }}"
+    - /usr/lib/systemd/system/{{ item.unit_name }}
     - "{{ fspart_systemd_lib_path }}/{{ item.unit_name }}"
     - "{{ fspart_systemd_share_path }}/{{ item.unit_name }}"
   loop_control:
     loop_var: fileitem
+    label: "{{ fileitem }}"
+  tags:
+    - facts
 
-#- ansible.builtin.debug: var=fspart_unit_location
-
-- name: Storing search results
+- name: Store detected remote unit path information
+  vars:
+    fspart_detected_unit_paths: >-
+      {{
+        fspart_unit_location.results
+        | selectattr('stat.exists', 'equalto', true)
+        | map(attribute='fileitem')
+        | list
+      }}
   ansible.builtin.set_fact:
-    fspart_systemd_unit_path: "{{ (fspart_unit_location.results | selectattr('rc', 'equalto', 0) |
-                              first).fileitem | default('not found') }}"
-    fspart_systemd_unit_found: "{{ (fspart_unit_location.results | selectattr('rc', 'equalto', 0) |
-                               first) is defined }}"
+    fspart_systemd_unit_path: "{{ fspart_detected_unit_paths | first | default('') }}"
+    fspart_systemd_unit_found: "{{ fspart_detected_unit_paths | length > 0 }}"
+  tags:
+    - facts
 
-- name: "Result:"
+- name: Check whether controller unit file exists
+  ansible.builtin.stat:
+    path: "{{ role_path }}/files/{{ item.unit_name }}"
+  delegate_to: localhost
+  become: false
+  register: fspart_controller_unit_file
+  tags:
+    - facts
+
+- name: Show detected mount unit source
   ansible.builtin.debug:
-    msg: "Unit {{ item.unit_name }} location: {{ fspart_systemd_unit_path }}"
+    msg:
+      - "Unit: {{ item.unit_name }}"
+      - "Remote source: {{ fspart_systemd_unit_path | default('not found', true) }}"
+      - "Controller source exists: {{ fspart_controller_unit_file.stat.exists }}"
+  tags:
+    - debug
 
-  # If not exist on etc path, try to copy unit first from ansible controller
-  # then try to copy from systemd locations
-- name: "Copy {{ item.unit_name }} from source locations to {{ fspart_systemd_etc_path }}"
-  when: fspart_systemd_unit_path != fspart_systemd_etc_path + '/' + item.unit_name
+- name: Copy mount unit into /etc/systemd/system when needed
+  when: fspart_systemd_unit_path != (fspart_systemd_etc_path ~ '/' ~ item.unit_name)
   block:
-
-    # First try to copy the unit file from controller
-    - name: "Try to copy unit file {{ item.unit_name }} from ansible controller"
-      ansible.builtin.copy:
-        src: "{{ item.unit_name }}"
-        dest: "{{ fspart_systemd_etc_path }}/{{ item.unit_name }}"
-        force: no
-        owner: root
-        group: root
-        mode: '0644'
-        remote_src: no
-      ignore_errors: yes
-      no_log: yes
-      notify: Reload systemd configuration
-      register: fspart_copy_result
-
-    - name: Fail if unit do not exist on ansible controller or on remote host
-      ansible.builtin.fail:
-        msg: "Unit {{ item.unit_name }} do not exist on ansible controller or on remote host"
-      when: fspart_copy_result is failed and not fspart_systemd_unit_found
-
-    # If it fails (do not exist on the controller) then try to copy it from
-    # remote host systemd locations
-    - name: "Copying {{ fspart_systemd_unit_path }} to {{ fspart_systemd_etc_path }}/{{ item.unit_name }}"
+    - name: Copy mount unit from remote systemd location when available
       ansible.builtin.copy:
         src: "{{ fspart_systemd_unit_path }}"
         dest: "{{ fspart_systemd_etc_path }}/{{ item.unit_name }}"
-        force: no
+        force: false
         owner: root
         group: root
         mode: '0644'
-        remote_src: yes
+        remote_src: true
+      when: fspart_systemd_unit_found
       notify: Reload systemd configuration
-      when: fspart_systemd_unit_found and fspart_copy_result is failed
+      tags:
+        - config
 
-- name: "Fix values in {{ fspart_systemd_etc_path }}/{{ item.unit_name }} if required"
-  block:
-
-    # Only found this problem on tmp.mount of Fedora 33 but it does not hurt
-    # to check on every platform
-    - name: "Add missing install section (if needed) for {{ item.unit_name }}"
-      community.general.ini_file:
-        path: '{{ fspart_systemd_etc_path }}/{{ item.unit_name }}'
-        section: Install
-        option: WantedBy
-        value: local-fs.target
-        no_extra_spaces: yes
+    - name: Copy mount unit from controller when no remote source exists
+      ansible.builtin.copy:
+        src: "{{ fspart_controller_unit_file.stat.path }}"
+        dest: "{{ fspart_systemd_etc_path }}/{{ item.unit_name }}"
+        force: false
+        owner: root
+        group: root
         mode: '0644'
-      notify:
-        - Reload systemd configuration
-        - Restart systemd unit
-        - Reboot
+      when:
+        - not fspart_systemd_unit_found
+        - fspart_controller_unit_file.stat.exists
+      notify: Reload systemd configuration
+      tags:
+        - config
 
-    - name: "Configure config file options for unit {{ item.unit_name }}"
-      ansible.builtin.lineinfile:
-        path: "{{ fspart_systemd_etc_path }}/{{ item.unit_name }}"
-        regexp: 'Options='
-        line: "{{ 'Options=' + (item['mount_options'] | join(',')) }}"
-        state: present
-      notify:
-        - Reload systemd configuration
-        - Restart systemd unit
-        - Reboot
+    - name: Fail when the mount unit was not found locally or remotely
+      ansible.builtin.fail:
+        msg: >-
+          Unit {{ item.unit_name }} was not found on the controller under
+          {{ role_path }}/files or in the known remote systemd unit locations.
+      when:
+        - not fspart_systemd_unit_found
+        - not fspart_controller_unit_file.stat.exists
+      tags:
+        - validate
 
-- name: Force systemd to reload in order to enable it to notice the changes
+- name: Ensure the mount unit has an Install section
+  community.general.ini_file:
+    path: "{{ fspart_systemd_etc_path }}/{{ item.unit_name }}"
+    section: Install
+    option: WantedBy
+    value: local-fs.target
+    no_extra_spaces: true
+    mode: '0644'
+  notify:
+    - Reload systemd configuration
+    - Restart systemd unit
+    - Reboot
+  tags:
+    - config
+
+- name: Ensure configured mount options are present in the mount unit
+  ansible.builtin.lineinfile:
+    path: "{{ fspart_systemd_etc_path }}/{{ item.unit_name }}"
+    regexp: '^Options='
+    line: "Options={{ item.mount_options | join(',') }}"
+    state: present
+  notify:
+    - Reload systemd configuration
+    - Restart systemd unit
+    - Reboot
+  tags:
+    - config
+
+- name: Flush handlers after mount unit changes
   ansible.builtin.meta: flush_handlers
+  tags:
+    - service

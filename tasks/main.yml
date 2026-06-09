@@ -1,45 +1,87 @@
 ---
-# tasks file for fspart
+- name: Run semantic validation
+  ansible.builtin.import_tasks: assert.yml
+  tags:
+    - validate
 
-- name: Execute role tasks
-  block:
+- name: Ensure util-linux is installed when fstrim support is requested
+  ansible.builtin.package:
+    name: util-linux
+    state: present
+  when: fs_fstrim_timer_enabled
+  tags:
+    - install
 
-    - name: Process input variables, adding default values
-      ansible.builtin.import_tasks: vars_defaults.yml
-    
-    - name: Check partition variables
-      ansible.builtin.import_tasks: asserts.yml
-    
-    - name: Install fstrim.timer if not present
-      become: yes
-      become_user: root
-      ansible.builtin.package:
-        name: util-linux
-        state: present
-      when: fs_fstrim_timer_enabled
-    
-    - name: Enable fstrim service
-      ansible.builtin.systemd:
-        name: fstrim.timer
-        enabled: yes
-      when: fs_fstrim_timer_enabled
-    
-    - name: Check crypttab entries
-      ansible.builtin.import_tasks: crypttab.yml
-    
-    - name: Check systemd unit files for each partition with autofix set to true (unit_name != fstab)
-      ansible.builtin.include_tasks: systemdmount.yml
-      loop: "{{ partitions | selectattr('autofix') | rejectattr('unit_name', 'equalto', 'fstab') | list }}"
-    
-    - name: Check fstab file for each partition with autofix set to true (unit_name == fstab)
-      ansible.builtin.include_tasks: fstab.yml
-      loop: "{{ partitions | selectattr('autofix') | selectattr('unit_name', 'equalto', 'fstab') | list }}"
-    
-    - name: Validate mount points
-      ansible.builtin.import_tasks: validate.yml
-    
-    - name: Fix filesystems permissions
-      ansible.builtin.import_tasks: fix_permissions.yml
-      when: fs_run_fix_permissions | default(true)
+- name: Gather service facts when service management is required
+  ansible.builtin.service_facts:
+  when: fs_disable_automount or fs_fstrim_timer_enabled
+  tags:
+    - facts
 
-  become: yes
+- name: Disable autofs when requested and the service exists
+  ansible.builtin.systemd:
+    name: autofs.service
+    enabled: false
+    masked: true
+    state: stopped
+  when:
+    - fs_disable_automount
+    - (ansible_facts['service_mgr'] | default('')) == 'systemd'
+    - "'autofs.service' in ansible_facts.services"
+  tags:
+    - config
+    - service
+
+- name: Enable and start fstrim.timer when requested
+  ansible.builtin.systemd:
+    name: fstrim.timer
+    enabled: true
+    state: started
+  when:
+    - fs_fstrim_timer_enabled
+    - (ansible_facts['service_mgr'] | default('')) == 'systemd'
+  tags:
+    - config
+    - service
+
+- name: Manage crypttab resources
+  ansible.builtin.import_tasks: crypttab.yml
+  when:
+    - fspart_crypttab_entries | length > 0 or fspart_cryptkeys_files | length > 0
+  tags:
+    - config
+    - service
+
+- name: Autofix partitions backed by systemd mount units
+  ansible.builtin.include_tasks: systemdmount.yml
+  loop: "{{ partitions | selectattr('autofix', 'equalto', true) | rejectattr('unit_name', 'equalto', 'fstab') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: partitions | length > 0
+  tags:
+    - config
+    - service
+
+- name: Autofix partitions backed by /etc/fstab
+  ansible.builtin.include_tasks: fstab.yml
+  loop: "{{ partitions | selectattr('autofix', 'equalto', true) | selectattr('unit_name', 'equalto', 'fstab') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: partitions | length > 0
+  tags:
+    - config
+    - service
+
+- name: Validate configured partitions
+  ansible.builtin.import_tasks: validate.yml
+  when: partitions | length > 0
+  tags:
+    - validate
+
+- name: Run filesystem permission checks
+  ansible.builtin.import_tasks: fix_permissions.yml
+  when: fs_run_fix_permissions
+  tags:
+    - validate
+    - config
+    - debug

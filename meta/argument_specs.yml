@@ -1,0 +1,169 @@
+---
+argument_specs:
+  main:
+    short_description: Configure partition validation, mount autofix, crypttab entries, and filesystem checks.
+    options:
+      fs_run_fix_permissions:
+        type: bool
+        default: true
+        description:
+          - Run filesystem permission and ownership checks.
+      fs_world_writeable_fix_enabled:
+        type: bool
+        default: false
+        description:
+          - Remove world-write permissions from regular files that are discovered.
+      fs_log_files_fix_enabled:
+        type: bool
+        default: false
+        description:
+          - Tighten permissions for files and directories under /var/log.
+      fs_unowned_detection_enabled:
+        type: bool
+        default: false
+        description:
+          - Fail when unowned files are detected.
+      fs_ungrouped_detection_enabled:
+        type: bool
+        default: false
+        description:
+          - Fail when ungrouped files are detected.
+      fs_world_writeable_excludes:
+        type: list
+        elements: str
+        default: []
+        description:
+          - Regex patterns used to exclude entries from the world-writable scan.
+      fspart_log_exception:
+        type: list
+        elements: str
+        default: []
+        description:
+          - Regex patterns used to exclude entries from the /var/log permission scan.
+      fs_fstrim_timer_enabled:
+        type: bool
+        default: true
+        description:
+          - Ensure fstrim.timer is enabled.
+      fs_disable_automount:
+        type: bool
+        default: true
+        description:
+          - Stop and mask autofs when the service exists.
+      fspart_cryptkeys_path:
+        type: str
+        default: /etc/cryptkeys
+        description:
+          - Directory used to store crypttab key files copied by this role.
+      fspart_crypttab_entries:
+        type: list
+        elements: dict
+        default: []
+        options:
+          name:
+            type: str
+            required: true
+            description:
+              - crypttab entry name.
+          backing_device:
+            type: str
+            required: false
+            description:
+              - Source device or UUID for the encrypted device.
+          password:
+            type: str
+            required: false
+            description:
+              - Password source or the literal value none.
+          opts:
+            type: str
+            required: false
+            description:
+              - crypttab options.
+        description:
+          - Crypttab entries to manage.
+      fspart_cryptkeys_files:
+        type: list
+        elements: dict
+        default: []
+        options:
+          name:
+            type: str
+            required: true
+            description:
+              - Destination file name below fspart_cryptkeys_path.
+          src:
+            type: str
+            required: true
+            description:
+              - Source file in the role files/ directory.
+        description:
+          - Key files copied below fspart_cryptkeys_path.
+      partitions:
+        type: list
+        elements: dict
+        default: []
+        description:
+          - >-
+            Partition definitions to validate and optionally autofix using fstab or
+            systemd mount units.
+        options:
+          name:
+            type: str
+            required: true
+            description:
+              - Mount point path.
+          unit_name:
+            type: str
+            required: false
+            default: ''
+            description:
+              - systemd mount unit name or the literal value fstab.
+          mount_options:
+            type: list
+            elements: str
+            required: false
+            default: []
+            description:
+              - Options written to the mount definition when autofix is enabled.
+          validate_options:
+            type: list
+            elements: str
+            required: false
+            default: []
+            description:
+              - Options required on the mounted filesystem.
+          autofix:
+            type: bool
+            required: false
+            default: false
+            description:
+              - Whether the role should adjust configuration for the partition.
+          src:
+            type: str
+            required: false
+            default: ''
+            description:
+              - Source device for fstab-managed entries.
+          fstype:
+            type: str
+            required: false
+            default: ''
+            description:
+              - Filesystem type for fstab-managed entries.
+          mount_state:
+            type: str
+            required: false
+            default: mounted
+            choices:
+              - present
+              - mounted
+              - unmounted
+              - absent
+            description:
+              - Desired ansible.posix.mount state when autofix uses fstab.
+      fspart_allow_reboot:
+        type: bool
+        default: true
+        description:
+          - Allow the reboot handler to run if remount or restart cannot complete cleanly.

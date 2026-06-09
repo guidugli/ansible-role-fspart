@@ -1,180 +1,245 @@
-Ansible Role: fspart
-=========
+# Ansible Role: fspart
 
-An Ansible Role that configure partitions on RHEL/CentOS, Fedora and Debian/Ubuntu. This role also perform security checks on filesystems (based on CIS recommendations).
+[![CI](https://github.com/guidugli/ansible-role-fspart/actions/workflows/CI.yml/badge.svg)](https://github.com/guidugli/ansible-role-fspart/actions/workflows/CI.yml)
+[![Release](https://github.com/guidugli/ansible-role-fspart/actions/workflows/release.yml/badge.svg)](https://github.com/guidugli/ansible-role-fspart/actions/workflows/release.yml)
+[![Galaxy](https://img.shields.io/badge/galaxy-guidugli.fspart-blue.svg)](https://galaxy.ansible.com/ui/standalone/roles/guidugli/fspart/)
+[![License](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 
+Configure and validate filesystem mounts, crypttab entries, and filesystem security controls.
 
-Requirements
-------------
+## Overview
 
-No requirements.
+This role focuses on filesystem compliance and guardrails rather than full disk provisioning.
+It can:
 
-Role Variables
---------------
+- validate required mount points and mount options;
+- optionally autofix mount configuration via `/etc/fstab` or systemd mount units;
+- manage crypttab entries and optional key files;
+- enable `fstrim.timer`;
+- disable `autofs` when requested; and
+- review or optionally remediate several filesystem permission findings.
 
-**Available variables are listed below, along with default values (see defaults/main.yml):**
+## Features
 
-    fs_run_fix_permissions: yes
+- Explicit defaults for all supported public variables.
+- Automatic role argument validation through `meta/argument_specs.yml`.
+- Semantic validation in `tasks/assert.yml` for combinations that argument specs alone cannot express.
+- Clean task dispatch in `tasks/main.yml`.
+- Idempotent handlers for mount-unit reloads and remount/reboot follow-up.
+- Metadata template in `templates/meta_main.yml.j2` with generated `meta/main.yml`.
+- Shared Molecule verify playbook pattern available under `molecule/shared/`.
 
-If set to yes, it will run all filesystem permission and ownership checking and repairing.
+## Supported platforms
 
-    fs_world_writeable_fix_enabled: false
+This role currently targets:
 
-If set to yes, the role will fix any file that can be written by everyone (others).
+- Fedora 42, 43
+- Ubuntu 22.04 (jammy), 24.04 (noble)
+- Debian 12 (bookworm), 13 (trixie)
 
-    fs_log_files_fix_enabled: false
+## Role variables
 
-If set to yes, it will fix any file under /var/log that can be read/written by others, or that can be written by group.
+### Permission and ownership checks
 
-    fs_unowned_detection_enabled: false
+```yaml
+fs_run_fix_permissions: true
+fs_world_writeable_fix_enabled: false
+fs_log_files_fix_enabled: false
+fs_unowned_detection_enabled: false
+fs_ungrouped_detection_enabled: false
+fs_world_writeable_excludes: []
+fspart_log_exception: []
+```
 
-If set to yes, it will stop the execution with an error if it finds files without owners. This only works if fs_run_fix_permissions is set to true.
+### Services and platform behavior
 
-    fs_ungrouped_detection_enabled: false
+```yaml
+fs_fstrim_timer_enabled: true
+fs_disable_automount: true
+fspart_allow_reboot: true
+```
 
-If set to try, it will stop the execution with an error if it finds files without group. Only works if fs_run_fix_permissions is set to true.
+### Crypttab management
 
-    #fs_world_writeable_excludes:
-    #  - /opt/var/log
-    #  - /opt/var/spool
+```yaml
+fspart_cryptkeys_path: /etc/cryptkeys
+fspart_crypttab_entries: []
+fspart_cryptkeys_files: []
+```
 
-Specify which directories to exclude from the result.
+Example crypttab entries:
 
-    #fspart_log_exception:
-    #  - /var/log
-    #  - /var/log/gdm
-    #  - /var/log/journal
-    #  - /var/log/btmp
-    #  - /var/log/journal/9ac3b4eccf62428bb4ae3d755c53b793
-    #  - /var/log/lastlog
-    #  - /var/log/wtmp
+```yaml
+fspart_crypttab_entries:
+  - name: luks-test
+    backing_device: UUID=6b244d35-a72b-1234-5678-4258d364809c
+    password: /etc/cryptkeys/mykey
+    opts: discard,luks
 
-List the log files to to be disconsidered when removing permissions. Log files should not allow any access to others and should not allow group to write to the file.
+fspart_cryptkeys_files:
+  - name: mykey
+    src: cryptkeys/mykey
+```
 
-    fs_fstrim_timer_enabled: yes
+### Partition definitions
 
-If set to true, fstrim.timer will be enabled and started.
+```yaml
+partitions: []
+```
 
-    fs_disable_automount: yes
+Each partition item supports these keys:
 
-If yes, disable automount.
+```yaml
+partitions:
+  - name: /tmp
+    unit_name: tmp.mount
+    mount_options:
+      - mode=1777
+      - strictatime
+      - nodev
+      - nosuid
+      - noexec
+    validate_options:
+      - nodev
+      - nosuid
+      - noexec
+    autofix: true
 
-    #fspart_cryptkeys_path: /etc/cryptkeys
+  - name: /var/tmp
+    unit_name: fstab
+    src: tmpfs
+    fstype: tmpfs
+    mount_state: mounted
+    mount_options:
+      - strictatime
+      - nodev
+      - nosuid
+      - noexec
+    validate_options:
+      - nodev
+      - nosuid
+      - noexec
+    autofix: true
+```
 
-Path to store files storing keys for encrypted partitions
+#### Partition item notes
 
-    #fspart_crypttab_entries:
-    #  name: luks-test
-    #  backing_device: UUID=6b244d35-a72b-1234-5678-4258d364809c
-    #  password: /etc/cryptkeys/mykey
-    #  opts: discard,luks
+- `name` is required and must be an absolute path.
+- `autofix: true` requires `unit_name` and `mount_options`.
+- `unit_name: fstab` uses `ansible.posix.mount`.
+- `unit_name: <name>.mount` uses a systemd mount unit under `/etc/systemd/system`.
+- `src` and `fstype` are required only when creating a new `fstab` entry.
+- `mount_state` defaults to `mounted`.
 
-Crypttab entries
+## How it works
 
-    #fspart_cryptkeys_files:
-    #  - { name: mykey, src: cryptkeys/mykey }
+1. Ansible validates argument structure using `meta/argument_specs.yml`.
+2. `tasks/assert.yml` validates semantic combinations and path expectations.
+3. `tasks/main.yml` dispatches optional behaviors only when relevant.
+4. Mount validation uses `findmnt`.
+5. Permission checks can run in audit-only mode or in remediation mode, depending on the selected booleans.
 
-Files to be copied to fspart_cryptkeys_path defined path
+## Usage
 
-    #partitions:
-    #  - name: /tmp
-    #    unit_name: tmp.mount
-    #    mount_options: ['mode=1777', 'strictatime', 'nodev', 'nosuid', 'noexec']
-    #    validate_options: ['nodev', 'nosuid', 'noexec']
-    #    autofix: yes
-    #  - name: /var
-    #  - name: /var/log
-    #  - name: /var/log/audit
-    #  - name: /var/tmp
-    #    options: ['nodev', 'nosuid', 'noexec']
-    #    unit_name: fstab
-    #    mount_options: ['strictatime', 'nodev', 'nosuid', 'noexec']
-    #    validate_options: ['nodev', 'nosuid', 'noexec']
-    #    src: 'tmpfs'
-    #    fstype: tmpfs
-    #    autofix: yes
-    #  - name: /home
-    #    options: ['nodev']
-    #  - name: /dev/shm
-    #    options: ['nodev', 'nosuid', 'noexec']
-    #  - name: /tmp_dir
-    #    unit_name: tmp_dir.mount
-    #    mount_options: ['mode=1777', 'strictatime', 'nodev', 'nosuid', 'noexec']
-    #    validate_options: ['nodev', 'nosuid', 'noexec']
-    #    autofix: yes
+### Basic validation-only run
 
-List of partitions that must be present on the system and the mount options they should have.
-
-Autofix will check and adjust configuration files so the filesystem is mounted properly. If the unit cannot be found in /etc/systemd/system, the role will attempt to copy a local file with same unit name from role's file directory, to the target system. If a local file with the unit name is found locally on role's file directory, it will try to copy it from /lib/systemd/system.
-
-NOTE: files on /etc/systemd/system will NOT be overwritten
-
-The mount_options is a list of all mount options that will be set on the unit mount point definition file (xxxxx.mount). The role will change the unit file to match these options.
-
-The validate_options is a list of mount options that the mounted filesystem must have. This variable will not cause any change on any configuration, but if a partition is mounted without it, the execution will fail.
-
-    fspart_allow_reboot: yes
-
-If mounting/remounting fail, is reboot allowed? Sometimes partitions cannot be mounted because they are busy (have other system components using it).
-
-**The variables listed below do not need to be changed for targeted systems (see vars/main.yml):**
-
-    fspart_systemd_etc_path: /etc/systemd/system
-
-This is the place to create custom units or to copy existing units from other places in order to customize it. Units found in other locations will be written to this location by this role, to prevent updates overwritting customizations.
-
-    fspart_systemd_lib_path: /lib/systemd/system
-
-If not already on etc path, this is the second place to look for units
-
-    fspart_systemd_share_path: /usr/share/systemd
-
-On Debian family systems this path has tmp.mount definition. So, this is the third path that the role will search for units.
-
-    fspart_unit_notify: ''
-
-This variable will be set during processing with the unit name being processed so handler can work on the correct mount unit file.
-
-Dependencies
-------------
-
-No dependencies.
-
-Example Playbook
-----------------
-
-    - hosts: servers
+```yaml
+---
+- name: Validate filesystem hardening expectations
+  hosts: all
+  become: true
+  roles:
+    - role: guidugli.fspart
       vars:
-          fs_world_writeable_fix_enabled: yes
-          partitions:
-            - name: /tmp
-              unit_name: tmp.mount
-              mount_options: ['mode=1777', 'strictatime', 'nodev', 'nosuid', 'noexec']
-              validate_options: ['nodev', 'nosuid', 'noexec']
-              autofix: yes
-            - name: /var/tmp
-              options: ['nodev', 'nosuid', 'noexec']
-              unit_name: fstab
-              mount_options: ['strictatime', 'nodev', 'nosuid', 'noexec']
-              validate_options: ['nodev', 'nosuid', 'noexec']
-              src: 'tmpfs'
-              fstype: tmpfs
-              autofix: yes
-            - name: /tmp_dir
-              unit_name: tmp_dir.mount
-              mount_options: ['mode=1777', 'strictatime', 'nodev', 'nosuid', 'noexec']
-              validate_options: ['nodev', 'nosuid', 'noexec']
-              autofix: yes
-          fspart_allow_reboot: false
-      roles:
-         - { guidugli.fspart }
+        partitions:
+          - name: /tmp
+            validate_options:
+              - nodev
+              - nosuid
+              - noexec
+```
 
-License
--------
+### Autofix a systemd mount unit and an fstab entry
 
-MIT / BSD
+```yaml
+---
+- name: Configure secure mount points
+  hosts: all
+  become: true
+  roles:
+    - role: guidugli.fspart
+      vars:
+        fs_world_writeable_fix_enabled: true
+        partitions:
+          - name: /tmp
+            unit_name: tmp.mount
+            mount_options:
+              - mode=1777
+              - strictatime
+              - nodev
+              - nosuid
+              - noexec
+            validate_options:
+              - nodev
+              - nosuid
+              - noexec
+            autofix: true
+          - name: /var/tmp
+            unit_name: fstab
+            src: tmpfs
+            fstype: tmpfs
+            mount_options:
+              - strictatime
+              - nodev
+              - nosuid
+              - noexec
+            validate_options:
+              - nodev
+              - nosuid
+              - noexec
+            autofix: true
+        fspart_allow_reboot: false
+```
 
-Author Information
-------------------
+## Design notes
 
-This role was created in 2020 by Carlos Guidugli.
+- This role expects privilege escalation to be set at the play level (`become: true`) when needed.
+- The role does not force `become` inside its task files, which keeps it compatible with Molecule container scenarios.
+- `raw` is not used in the modernized task flow because this role is not a pre-Python bootstrap role.
+- `fs_disable_automount` stops and masks `autofs` only when the service exists.
+
+## Molecule testing
+
+The repository currently contains role-specific scenario files under `molecule/default/` that you asked to keep untouched.
+A modern shared verification playbook pattern is included as `molecule/shared/verify.yml` for consistency with newer roles.
+When you are ready to standardize scenario wiring, point the scenario verify playbooks to the shared file.
+
+## Release workflow
+
+- `templates/meta_main.yml.j2` is the metadata source of truth.
+- `meta/main.yml` should be regenerated from that template as part of the release/update workflow.
+- If you later allow updates under `scripts/`, reuse the same metadata/render helper pattern used in your bootstrap role rather than creating a role-specific variant.
+
+## Repository structure
+
+```text
+.
+├── defaults/
+├── files/
+├── handlers/
+├── meta/
+├── molecule/
+│   ├── default/
+│   └── shared/
+├── tasks/
+├── templates/
+└── vars/
+```
+
+## License
+
+MIT
+
+## Author
+
+Carlos Guidugli

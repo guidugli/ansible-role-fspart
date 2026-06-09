@@ -1,32 +1,25 @@
 ---
-# handlers file for fspart
-
-# Reload daemon if any unit added or changed on disk
 - name: Reload systemd configuration
-  become: yes
   ansible.builtin.systemd:
-    daemon_reload: yes
+    daemon_reload: true
 
 - name: Restart systemd unit
-  become: yes
   ansible.builtin.systemd:
     name: "{{ fspart_unit_notify }}"
-    enabled: yes
+    enabled: true
     state: restarted
-  ignore_errors: yes  # noqa ignore-errors
   when: fspart_unit_notify != 'tmp.mount'
+  ignore_errors: true  # noqa ignore-errors
 
 - name: Remount filesystem
-  become: yes
   ansible.posix.mount:
     path: "{{ fspart_mount_point }}"
     state: remounted
-  ignore_errors: yes  # noqa ignore-errors
+  ignore_errors: true  # noqa ignore-errors
 
 - name: Reboot
-  become: yes
   ansible.builtin.reboot:
-    msg: "Reboot initiated by Ansible for updates"
+    msg: Reboot initiated by Ansible after filesystem configuration changes.
     connect_timeout: 5
     reboot_timeout: 300
     pre_reboot_delay: 0
@@ -34,4 +27,4 @@
     test_command: uptime
   when:
     - fspart_allow_reboot | bool
-    - ansible_connection != "docker"
+    - ansible_connection != 'docker'

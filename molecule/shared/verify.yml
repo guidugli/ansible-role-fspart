@@ -1,0 +1,41 @@
+---
+- name: Verify fspart role behavior
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: Gather package facts
+      ansible.builtin.package_facts:
+        manager: auto
+
+    - name: Validate util-linux is present
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - "'util-linux' in ansible_facts.packages"
+
+    - name: Check /tmp mount options
+      ansible.builtin.command:
+        argv:
+          - findmnt
+          - -O
+          - nodev,nosuid,noexec
+          - /tmp
+      changed_when: false
+
+    - name: Check /var/tmp mount options
+      ansible.builtin.command:
+        argv:
+          - findmnt
+          - -O
+          - nodev,nosuid,noexec
+          - /var/tmp
+      changed_when: false
+
+    - name: Check /tmp_dir mount options
+      ansible.builtin.command:
+        argv:
+          - findmnt
+          - -O
+          - nodev,nosuid,noexec
+          - /tmp_dir
+      changed_when: false

@@ -1,0 +1,93 @@
+---
+- name: Validate public role variables
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - fspart_cryptkeys_path is string
+      - fspart_cryptkeys_path is match('^/')
+      - fs_world_writeable_excludes is sequence
+      - fspart_log_exception is sequence
+      - fspart_crypttab_entries is sequence
+      - fspart_cryptkeys_files is sequence
+      - partitions is sequence
+    fail_msg: One or more role variables have invalid base types or values.
+  tags:
+    - validate
+
+- name: Validate crypttab entry structures
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - item.name | string | trim | length > 0
+      - item.backing_device is not defined or item.backing_device | string | trim | length > 0
+      - item.password is not defined or item.password | string | trim | length > 0
+      - item.opts is not defined or item.opts | string | trim | length > 0
+    fail_msg: Invalid crypttab entry for {{ item.name | default('unnamed entry') }}.
+  loop: "{{ fspart_crypttab_entries }}"
+  loop_control:
+    label: "{{ item.name | default('unnamed entry') }}"
+  tags:
+    - validate
+
+- name: Validate crypt key file structures
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - item.name | string | trim | length > 0
+      - item.src | string | trim | length > 0
+    fail_msg: Invalid crypt key file definition for {{ item.name | default('unnamed file') }}.
+  loop: "{{ fspart_cryptkeys_files }}"
+  loop_control:
+    label: "{{ item.name | default('unnamed file') }}"
+  tags:
+    - validate
+
+- name: Validate partition definitions
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - item.name | string | trim | length > 0
+      - item.name is match('^/')
+      - item.unit_name is not defined or item.unit_name is string
+      - item.mount_options is not defined or item.mount_options is sequence
+      - item.validate_options is not defined or item.validate_options is sequence
+      - item.mount_state is not defined or item.mount_state in ['present', 'mounted', 'unmounted', 'absent']
+      - not (item.autofix | default(false) | bool) or item.unit_name | string | trim | length > 0
+      - not (item.autofix | default(false) | bool) or item.mount_options | default([]) | length > 0
+      - not (item.autofix | default(false) | bool) or item.unit_name == 'fstab' or item.unit_name.endswith('.mount')
+      - item.src is not defined or item.src is string
+      - item.fstype is not defined or item.fstype is string
+    fail_msg: Invalid partition definition for {{ item.name | default('unnamed partition') }}.
+  loop: "{{ partitions }}"
+  loop_control:
+    label: "{{ item.name | default('unnamed partition') }}"
+  tags:
+    - validate
+
+- name: Validate partition option list contents
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - option_item | string | trim | length > 0
+    fail_msg: Invalid mount option for {{ item.0.name }}.
+  loop: "{{ partitions | subelements('mount_options', skip_missing=True) }}"
+  loop_control:
+    label: "{{ item.0.name }} -> {{ option_item }}"
+  vars:
+    option_item: "{{ item.1 }}"
+  tags:
+    - validate
+
+- name: Validate partition validation option list contents
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - option_item | string | trim | length > 0
+    fail_msg: Invalid validate option for {{ item.0.name }}.
+  loop: "{{ partitions | subelements('validate_options', skip_missing=True) }}"
+  loop_control:
+    label: "{{ item.0.name }} -> {{ option_item }}"
+  vars:
+    option_item: "{{ item.1 }}"
+  tags:
+    - validate

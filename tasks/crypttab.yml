@@ -1,18 +1,16 @@
 ---
-
-- name: "Create directory {{ crypt_path }}"
-  vars:
-    crypt_path: "{{ fspart_cryptkeys_path | default('/etc/cryptkeys', true) }}"
+- name: Ensure crypt key directory exists
   ansible.builtin.file:
-    path: "{{ crypt_path }}"
+    path: "{{ fspart_cryptkeys_path }}"
     owner: root
     group: root
     mode: '0700'
     state: directory
-    modification_time: preserve
-    access_time: preserve
+  when: fspart_cryptkeys_files | length > 0
+  tags:
+    - config
 
-- name: Copy file with owner and permissions
+- name: Copy crypt key files
   ansible.builtin.copy:
     src: "{{ item.src }}"
     dest: "{{ fspart_cryptkeys_path }}/{{ item.name }}"
@@ -20,26 +18,37 @@
     group: root
     mode: '0600'
   loop: "{{ fspart_cryptkeys_files }}"
-  when: fspart_cryptkeys_files is defined
+  loop_control:
+    label: "{{ item.name }}"
+  when: fspart_cryptkeys_files | length > 0
+  tags:
+    - config
 
-- name: Set crypttab
+- name: Manage crypttab entries
   community.general.crypttab:
     name: "{{ item.name }}"
-    backing_device: "{{ item.backing_device }}"
-    password: "{{ item.password }}"
-    opts: "{{ item.opts }}"
+    backing_device: "{{ item.backing_device | default(omit) }}"
+    password: "{{ item.password | default(omit) }}"
+    opts: "{{ item.opts | default(omit) }}"
     state: present
   loop: "{{ fspart_crypttab_entries }}"
-  when: fspart_crypttab_entries is defined
+  loop_control:
+    label: "{{ item.name }}"
+  when: fspart_crypttab_entries | length > 0
+  tags:
+    - config
 
-- name: Run systemd to load the crypttab entries
-  vars:
-    encoded: "{{ item.name | replace('-', '\\x2d') }}"
+- name: Start systemd cryptsetup units for non-none password entries
   ansible.builtin.systemd:
-    name: "systemd-cryptsetup@{{ encoded }}"
+    name: "systemd-cryptsetup@{{ item.name | replace('-', '\x2d') }}"
     state: started
-    daemon_reload: yes
+    daemon_reload: true
   loop: "{{ fspart_crypttab_entries }}"
+  loop_control:
+    label: "{{ item.name }}"
   when:
-    - fspart_crypttab_entries is defined
-    - item.password != 'none'
+    - (ansible_facts["service_mgr"] | default('')) == 'systemd'
+    - fspart_crypttab_entries | length > 0
+    - item.password | default('') != 'none'
+  tags:
+    - service

@@ -1,0 +1,87 @@
+---
+- name: Converge
+  hosts: all
+  become: false
+  gather_facts: true
+  vars:
+    fs_world_writeable_fix_enabled: true
+    fspart_allow_reboot: false
+    fspart_log_exception:
+      - /var/log/gdm
+      - /var/log/journal
+      - /var/log/btmp
+      - /var/log/lastlog
+      - /var/log/wtmp
+
+    partitions:
+      - name: /opt/test
+        unit_name: fstab
+        src: tmpfs
+        fstype: tmpfs
+        mount_options:
+          - strictatime
+          - nodev
+          - nosuid
+          - noexec
+        validate_options:
+          - nodev
+          - nosuid
+          - noexec
+        autofix: true
+
+      - name: /tmp
+        unit_name: tmp.mount
+        mount_options:
+          - mode=1777
+          - strictatime
+          - nodev
+          - nosuid
+          - noexec
+        validate_options:
+          - nodev
+          - nosuid
+          - noexec
+        autofix: true
+
+      - name: /var/tmp
+        unit_name: fstab
+        src: tmpfs
+        fstype: tmpfs
+        mount_options:
+          - strictatime
+          - nodev
+          - nosuid
+          - noexec
+        validate_options:
+          - nodev
+          - nosuid
+          - noexec
+        autofix: true
+
+      - name: /tmp_dir
+        unit_name: tmp_dir.mount
+        mount_options:
+          - mode=1777
+          - strictatime
+          - nodev
+          - nosuid
+          - noexec
+        validate_options:
+          - nodev
+          - nosuid
+          - noexec
+        autofix: true
+
+  pre_tasks:
+    - name: Ensure /etc/fstab exists
+      ansible.builtin.file:
+        path: /etc/fstab
+        state: touch
+        modification_time: preserve
+        access_time: preserve
+        mode: '0644'
+        owner: root
+        group: root
+
+  roles:
+    - role: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"

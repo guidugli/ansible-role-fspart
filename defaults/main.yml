@@ -1,122 +1,18 @@
 ---
-# defaults file for fspart
-
-#### PERMISSION CHECKING ####
-
-# If set to true, it will run all filesystem permission and
-# ownership checking and repairing.
 fs_run_fix_permissions: true
-
-# If set to true, the role will fix any
-# file that can be written by everyone (others).
-# Only works if fs_run_fix_permissions is set to true
 fs_world_writeable_fix_enabled: false
-
-# If set to true, it will fix any file under /var/log
-# that can be read/written by others, or that can be
-# written by group.
-# Only works if fs_run_fix_permissions is set to true
 fs_log_files_fix_enabled: false
-
-# If set to try, it will stop the execution with an error
-# if it finds files without owners
-# Only works if fs_run_fix_permissions is set to true
 fs_unowned_detection_enabled: false
-
-# If set to try, it will stop the execution with an error
-# if it finds files without group
-# Only works if fs_run_fix_permissions is set to true
 fs_ungrouped_detection_enabled: false
+fs_world_writeable_excludes: []
+fspart_log_exception: []
+fs_fstrim_timer_enabled: true
+fs_disable_automount: true
 
-# Specify which directories to exclude from the result
-# Only works if fs_world_writeable_fix_enabled is true
-#fs_world_writeable_excludes:
-#  - /opt/var/log
-#  - /opt/var/spool
+fspart_cryptkeys_path: /etc/cryptkeys
+fspart_crypttab_entries: []
+fspart_cryptkeys_files: []
 
-# List the log files to ignore when removing permissions g-wx and o-rwx
-#fspart_log_exception:
-#  - /var/log
-#  - /var/log/gdm
-#  - /var/log/journal
-#  - /var/log/btmp
-#  - /var/log/journal/9ac3b4eccf62428bb4ae3d755c53b793
-#  - /var/log/lastlog
-#  - /var/log/wtmp
+partitions: []
 
-# If set to true, fstrim.timer will be enabled and started
-fs_fstrim_timer_enabled: yes
-
-# Disable auto mount
-fs_disable_automount: yes
-
-#### CRYPTTAB ####
-
-# all crypttab variables are optional
-
-# Path to store files storing keys for encrypted partitions
-#fspart_cryptkeys_path: /etc/cryptkeys
-
-# Crypttab entries
-#fspart_crypttab_entries:
-#  name: luks-test
-#  backing_device: UUID=6b244d35-a72b-1234-5678-4258d364809c
-#  password: /etc/cryptkeys/mykey
-#  opts: discard,luks
-
-# Files to be copied to fspart_cryptkeys_path defined path
-#fspart_cryptkeys_files:
-#  - { name: mykey, src: cryptkeys/mykey }
-
-#### PARTITIONS ####
-
-# List of partitions that must be present on the system
-# and the mount options they should have.
-
-# Autofix will check and adjust configuration files so the filesystem
-# is mounted properly. If the unit cannot be found in /etc/systemd/system,
-# the role will attempt to copy a local file with same unit name from
-# role's file directory, to the target system. If a local file with the
-# unit name is found locally on role's file directory, it will try to copy \
-# it from /lib/systemd/system.
-# NOTE: files on /etc/systemd/system will NOT be overwritten
-
-# The mount_options is a list of all mount options that will be set on the
-# unit mount point definition file (xxxxx.mount). The role will change the
-# unit file to match these options.
-
-# The validate_options is a list of mount options that the mounted filesystem
-# must have. This variable will not cause any change on any configuration,
-# but if a partition is mounted without it, the execution will fail.
-
-#partitions:
-#  - name: /tmp
-#    unit_name: tmp.mount
-#    mount_options: ['mode=1777', 'strictatime', 'nodev', 'nosuid', 'noexec']
-#    validate_options: ['nodev', 'nosuid', 'noexec']
-#    autofix: yes
-#  - name: /var
-#  - name: /var/log
-#  - name: /var/log/audit
-#  - name: /var/tmp
-#    options: ['nodev', 'nosuid', 'noexec']
-#    unit_name: fstab
-#    mount_options: ['strictatime', 'nodev', 'nosuid', 'noexec']
-#    validate_options: ['nodev', 'nosuid', 'noexec']
-#    src: 'tmpfs'
-#    fstype: tmpfs
-#    autofix: yes
-#  - name: /home
-#    options: ['nodev']
-#  - name: /dev/shm
-#    options: ['nodev', 'nosuid', 'noexec']
-#  - name: /tmp_dir
-#    unit_name: tmp_dir.mount
-#    mount_options: ['mode=1777', 'strictatime', 'nodev', 'nosuid', 'noexec']
-#    validate_options: ['nodev', 'nosuid', 'noexec']
-#    autofix: yes
-
-# If mounting/remounting fail, is reboot allowed?
-# Sometimes partitions cannot be mounted because they
-# are busy (have other system components using it).
-fspart_allow_reboot: yes
+fspart_allow_reboot: true

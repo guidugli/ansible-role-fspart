@@ -11,17 +11,13 @@ galaxy_info:
   license: MIT
   min_ansible_version: '2.16'
   platforms:
-    - name: Fedora
+{% for platform in platforms %}
+    - name: {{ platform.name }}
       versions:
-        - "all"
-    - name: Ubuntu
-      versions:
-        - "resolute"
-        - "noble"
-    - name: Debian
-      versions:
-        - "trixie"
-        - "bookworm"
+{%   for version in platform.versions %}
+        - {{ version | tojson }}
+{%   endfor %}
+{% endfor %}
   galaxy_tags:
     - filesystem
     - hardening

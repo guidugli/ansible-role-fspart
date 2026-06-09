@@ -1,61 +1,68 @@
 ---
-
-# This file contains tasks to create/update entry in /etc/fstab
-# When updating existing entry, the user do not need to provide
-# src and fstype, as it will be retrieved from fstab file. But
-# if the entry do not exist in fstab file and not all variables
-# are present, then stop execution with error.
-
-- name: Set variable to be used on notifications
+- name: Track mount point used by handlers
   ansible.builtin.set_fact:
     fspart_mount_point: "{{ item.name }}"
+  tags:
+    - facts
 
-- name: Check if entry already exists on fstab
-  ansible.builtin.command: >
-    grep -E '^[^#].*?\s+{{ item.name }}\s+' /etc/fstab
-  register: fstab_cmd_result
-  failed_when: fstab_cmd_result.stderr | length > 0
+- name: Query existing fstab entry
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - --fstab
+      - --target
+      - "{{ item.name }}"
+      - --output
+      - SOURCE,FSTYPE,OPTIONS
+      - --noheadings
+      - --raw
+  register: fspart_fstab_entry
   changed_when: false
+  failed_when: false
+  tags:
+    - facts
+    - validate
 
-- name: If do not exist, create entry
-  when: fstab_cmd_result.stdout | length == 0
-  block:
-    - name: Check if partition UUID was informed
-      ansible.builtin.assert:
-        that:
-          - item.src is defined
-          - item.src | length > 0
-          - item.fstype is defined
-          - item.fstype in fspart_allowed_fstype
-        quiet: yes
+- name: Validate required creation inputs for new fstab entries
+  ansible.builtin.assert:
+    quiet: true
+    that:
+      - item.src | default('') | string | trim | length > 0
+      - item.fstype | default('') in fspart_allowed_fstype
+    fail_msg: >-
+      Partition {{ item.name }} is configured with autofix via fstab but no existing
+      fstab entry was found and src/fstype were not fully provided.
+  when: fspart_fstab_entry.rc != 0
+  tags:
+    - validate
 
-    - name: Show item details
-      ansible.builtin.debug:
-        var: item
+- name: Create or update fstab entry when no existing entry is present
+  ansible.posix.mount:
+    path: "{{ item.name }}"
+    src: "{{ item.src }}"
+    fstype: "{{ item.fstype }}"
+    opts: "{{ item.mount_options | join(',') }}"
+    state: "{{ item.mount_state | default('mounted') }}"
+  when: fspart_fstab_entry.rc != 0
+  tags:
+    - config
+    - service
 
-    - name: Create entry in fstab
-      ansible.posix.mount:
-        path: "{{ item.name }}"
-        src: "{{ item.src }}"
-        fstype: "{{ item.fstype }}"
-        opts: "{{ item.mount_options | join(',') }}"
-        state: "{{ item.mount_state | default('mounted') }}"
+- name: Build parsed values from the existing fstab entry
+  ansible.builtin.set_fact:
+    fspart_fstab_fields: "{{ fspart_fstab_entry.stdout.split() }}"
+  when: fspart_fstab_entry.rc == 0
+  tags:
+    - facts
 
-- name: Entry exists, check options
-  when: fstab_cmd_result.stdout | length > 0
-  block:
-    - name: Parse result into variables
-      vars:
-        fstab_cmd_result_split: "{{ fstab_cmd_result.stdout.split(' ') | reject('equalto', '') | list }}"
-      ansible.builtin.set_fact:
-        fstab_src: "{{ fstab_cmd_result_split[0] }}"
-        fstab_fstype: "{{ fstab_cmd_result_split[2] }}"
-        fstab_options: "{{ fstab_cmd_result_split[3] }}"
-
-    - name: "Ensure mount options are correct for {{ item.name }}"
-      ansible.posix.mount:
-        path: "{{ item.name }}"
-        src: "{{ fstab_src }}"
-        fstype: "{{ fstab_fstype }}"
-        opts: "{{ item.mount_options | join(',') }}"
-        state: mounted
+- name: Update mount options for an existing fstab entry
+  ansible.posix.mount:
+    path: "{{ item.name }}"
+    src: "{{ fspart_fstab_fields[0] }}"
+    fstype: "{{ fspart_fstab_fields[1] }}"
+    opts: "{{ item.mount_options | join(',') }}"
+    state: mounted
+  when: fspart_fstab_entry.rc == 0
+  tags:
+    - config
+    - service
