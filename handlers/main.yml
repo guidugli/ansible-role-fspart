@@ -1,21 +1,33 @@
 ---
 - name: Reload systemd configuration
-  ansible.builtin.systemd:
+  ansible.builtin.systemd_service:
     daemon_reload: true
+  when: ansible_facts['service_mgr'] == 'systemd'
+  tags:
+    - fspart
+    - service
 
 - name: Restart systemd unit
-  ansible.builtin.systemd:
+  ansible.builtin.systemd_service:
     name: "{{ fspart_unit_notify }}"
     enabled: true
     state: restarted
-  when: fspart_unit_notify != 'tmp.mount'
-  ignore_errors: true  # noqa ignore-errors
+  when:
+    - ansible_facts['service_mgr'] == 'systemd'
+    - fspart_unit_notify != 'tmp.mount'
+  failed_when: false
+  tags:
+    - fspart
+    - service
 
 - name: Remount filesystem
   ansible.posix.mount:
     path: "{{ fspart_mount_point }}"
     state: remounted
-  ignore_errors: true  # noqa ignore-errors
+  failed_when: false
+  tags:
+    - fspart
+    - service
 
 - name: Reboot
   ansible.builtin.reboot:
@@ -27,4 +39,7 @@
     test_command: uptime
   when:
     - fspart_allow_reboot | bool
-    - ansible_connection != 'docker'
+    - ansible_connection not in ['docker', 'containers.podman.podman']
+  tags:
+    - fspart
+    - service

@@ -1,6 +1,7 @@
 ---
 - name: Review and optionally fix /var/log permissions
   tags:
+    - fspart
     - validate
     - config
     - debug
@@ -13,12 +14,15 @@
       register: fspart_log_scan
       changed_when: false
       tags:
+        - fspart
         - validate
 
     - name: Build filtered /var/log results
       ansible.builtin.set_fact:
         fspart_log_scan_filtered: "{{ fspart_log_scan.stdout_lines }}"
       tags:
+        - fspart
+        - validate
         - facts
 
     - name: Exclude configured /var/log exceptions
@@ -30,6 +34,8 @@
         label: "{{ item }}"
       when: fspart_log_exception | length > 0
       tags:
+        - fspart
+        - validate
         - facts
 
     - name: Show /var/log entries selected for remediation
@@ -39,6 +45,8 @@
           - "{{ fspart_log_scan_filtered }}"
           - '----------------------------------------'
       tags:
+        - fspart
+        - validate
         - debug
 
     - name: Tighten /var/log permissions
@@ -52,10 +60,12 @@
         - fs_log_files_fix_enabled
         - fspart_log_scan_filtered | length > 0
       tags:
+        - fspart
         - config
 
 - name: Review and optionally fix world-writable files
   tags:
+    - fspart
     - validate
     - config
     - debug
@@ -71,12 +81,15 @@
       register: fspart_world_writable_scan
       changed_when: false
       tags:
+        - fspart
         - validate
 
     - name: Build filtered world-writable results
       ansible.builtin.set_fact:
         fspart_world_writable_filtered: "{{ fspart_world_writable_scan.stdout_lines }}"
       tags:
+        - fspart
+        - validate
         - facts
 
     - name: Exclude configured world-writable exceptions
@@ -88,6 +101,8 @@
         label: "{{ item }}"
       when: fs_world_writeable_excludes | length > 0
       tags:
+        - fspart
+        - validate
         - facts
 
     - name: Show world-writable entries selected for remediation
@@ -97,6 +112,8 @@
           - "{{ fspart_world_writable_filtered }}"
           - '---------------------------------------'
       tags:
+        - fspart
+        - validate
         - debug
 
     - name: Remove world-write permission from selected files
@@ -110,10 +127,12 @@
         - fs_world_writeable_fix_enabled
         - fspart_world_writable_filtered | length > 0
       tags:
+        - fspart
         - config
 
 - name: Detect unowned files
   tags:
+    - fspart
     - validate
     - debug
   block:
@@ -131,6 +150,7 @@
       changed_when: false
       failed_when: false
       tags:
+        - fspart
         - validate
 
     - name: Show unowned files when detected
@@ -143,6 +163,8 @@
       failed_when: false
       when: fspart_unowned_scan.stdout | length > 0
       tags:
+        - fspart
+        - validate
         - debug
 
     - name: Fail when unowned files are detected and strict mode is enabled
@@ -152,6 +174,7 @@
         - fs_unowned_detection_enabled
         - fspart_unowned_scan.stdout | length > 0
       tags:
+        - fspart
         - validate
 
 - name: Detect ungrouped files
@@ -162,6 +185,7 @@
         in ['docker', 'lxc', 'containerd', 'container']
       }}
   tags:
+    - fspart
     - validate
     - debug
   block:
@@ -179,6 +203,7 @@
       changed_when: false
       failed_when: false
       tags:
+        - fspart
         - validate
 
     - name: Show ungrouped files when detected
@@ -191,6 +216,8 @@
       failed_when: false
       when: fspart_ungrouped_scan.stdout | length > 0
       tags:
+        - fspart
+        - validate
         - debug
 
     - name: Fail when ungrouped files are detected and strict mode is enabled
@@ -200,10 +227,12 @@
         - fs_ungrouped_detection_enabled
         - fspart_ungrouped_scan.stdout | length > 0
       tags:
+        - fspart
         - validate
 
 - name: List SUID files for review
   tags:
+    - fspart
     - validate
     - debug
   block:
@@ -218,6 +247,7 @@
       changed_when: false
       failed_when: false
       tags:
+        - fspart
         - validate
 
     - name: Show SUID files when detected
@@ -230,10 +260,13 @@
       failed_when: false
       when: fspart_suid_scan.stdout | length > 0
       tags:
+        - fspart
+        - validate
         - debug
 
 - name: List SGID files for review
   tags:
+    - fspart
     - validate
     - debug
   block:
@@ -248,6 +281,7 @@
       changed_when: false
       failed_when: false
       tags:
+        - fspart
         - validate
 
     - name: Show SGID files when detected
@@ -260,4 +294,6 @@
       failed_when: false
       when: fspart_sgid_scan.stdout | length > 0
       tags:
+        - fspart
+        - validate
         - debug

@@ -1,3 +1,8 @@
+[![CI](https://github.com/guidugli/ansible-role-fspart/actions/workflows/CI.yml/badge.svg)](https://github.com/guidugli/ansible-role-fspart/actions/workflows/CI.yml)
+[![Release](https://img.shields.io/github/v/release/guidugli/ansible-role-fspart?display_name=tag)](https://github.com/guidugli/ansible-role-fspart/releases)
+[![Galaxy](https://img.shields.io/ansible/role/d/guidugli/fspart)](https://galaxy.ansible.com/ui/standalone/roles/guidugli/fspart/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 # Ansible Role: fspart
 
 [![CI](https://github.com/guidugli/ansible-role-fspart/actions/workflows/CI.yml/badge.svg)](https://github.com/guidugli/ansible-role-fspart/actions/workflows/CI.yml)

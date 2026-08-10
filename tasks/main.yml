@@ -2,6 +2,7 @@
 - name: Run semantic validation
   ansible.builtin.import_tasks: assert.yml
   tags:
+    - fspart
     - validate
 
 - name: Ensure util-linux is installed when fstrim support is requested
@@ -10,12 +11,15 @@
     state: present
   when: fs_fstrim_timer_enabled
   tags:
+    - fspart
     - install
 
 - name: Gather service facts when service management is required
   ansible.builtin.service_facts:
   when: fs_disable_automount or fs_fstrim_timer_enabled
   tags:
+    - fspart
+    - validate
     - facts
 
 - name: Disable autofs when requested and the service exists
@@ -29,18 +33,57 @@
     - (ansible_facts['service_mgr'] | default('')) == 'systemd'
     - "'autofs.service' in ansible_facts.services"
   tags:
+    - fspart
     - config
     - service
 
+- name: Check whether fstrim.timer is enabled
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - is-enabled
+      - fstrim.timer
+  register: fspart_fstrim_timer_enabled
+  changed_when: false
+  failed_when: false
+  when:
+    - fs_fstrim_timer_enabled
+    - (ansible_facts['service_mgr'] | default('')) == 'systemd'
+  tags:
+    - fspart
+    - validate
+
+- name: Check whether fstrim.timer is active
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - is-active
+      - --quiet
+      - fstrim.timer
+  register: fspart_fstrim_timer_active
+  changed_when: false
+  failed_when: false
+  when:
+    - fs_fstrim_timer_enabled
+    - (ansible_facts['service_mgr'] | default('')) == 'systemd'
+  tags:
+    - fspart
+    - validate
+
 - name: Enable and start fstrim.timer when requested
-  ansible.builtin.systemd:
+  ansible.builtin.systemd_service:
     name: fstrim.timer
     enabled: true
     state: started
   when:
     - fs_fstrim_timer_enabled
     - (ansible_facts['service_mgr'] | default('')) == 'systemd'
+    - >-
+      (fspart_fstrim_timer_enabled.stdout | default('')) not in
+      ['enabled', 'enabled-runtime'] or
+      (fspart_fstrim_timer_active.rc | default(1)) != 0
   tags:
+    - fspart
     - config
     - service
 
@@ -49,6 +92,7 @@
   when:
     - fspart_crypttab_entries | length > 0 or fspart_cryptkeys_files | length > 0
   tags:
+    - fspart
     - config
     - service
 
@@ -57,8 +101,11 @@
   loop: "{{ partitions | selectattr('autofix', 'equalto', true) | rejectattr('unit_name', 'equalto', 'fstab') | list }}"
   loop_control:
     label: "{{ item.name }}"
-  when: partitions | length > 0
+  when:
+    - partitions | length > 0
+    - (ansible_facts['service_mgr'] | default('')) == 'systemd'
   tags:
+    - fspart
     - config
     - service
 
@@ -69,6 +116,7 @@
     label: "{{ item.name }}"
   when: partitions | length > 0
   tags:
+    - fspart
     - config
     - service
 
@@ -76,12 +124,14 @@
   ansible.builtin.import_tasks: validate.yml
   when: partitions | length > 0
   tags:
+    - fspart
     - validate
 
 - name: Run filesystem permission checks
   ansible.builtin.import_tasks: fix_permissions.yml
   when: fs_run_fix_permissions
   tags:
+    - fspart
     - validate
     - config
     - debug

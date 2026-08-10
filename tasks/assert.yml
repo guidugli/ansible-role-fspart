@@ -12,6 +12,7 @@
       - partitions is sequence
     fail_msg: One or more role variables have invalid base types or values.
   tags:
+    - fspart
     - validate
 
 - name: Validate crypttab entry structures
@@ -27,6 +28,7 @@
   loop_control:
     label: "{{ item.name | default('unnamed entry') }}"
   tags:
+    - fspart
     - validate
 
 - name: Validate crypt key file structures
@@ -40,6 +42,7 @@
   loop_control:
     label: "{{ item.name | default('unnamed file') }}"
   tags:
+    - fspart
     - validate
 
 - name: Validate partition definitions
@@ -62,6 +65,7 @@
   loop_control:
     label: "{{ item.name | default('unnamed partition') }}"
   tags:
+    - fspart
     - validate
 
 - name: Validate partition option list contents
@@ -76,6 +80,7 @@
   vars:
     option_item: "{{ item.1 }}"
   tags:
+    - fspart
     - validate
 
 - name: Validate partition validation option list contents
@@ -90,4 +95,5 @@
   vars:
     option_item: "{{ item.1 }}"
   tags:
+    - fspart
     - validate

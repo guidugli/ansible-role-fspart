@@ -2,40 +2,78 @@
 - name: Verify fspart role behavior
   hosts: all
   gather_facts: true
+  vars:
+    fspart_molecule_systemd: >-
+      {{ (ansible_facts['service_mgr'] | default('')) == 'systemd' }}
   tasks:
     - name: Gather package facts
       ansible.builtin.package_facts:
         manager: auto
+      tags:
+        - fspart
+        - validate
 
-    - name: Validate util-linux is present
+    - name: Validate util-linux implementation is present
       ansible.builtin.assert:
         quiet: true
         that:
-          - "'util-linux' in ansible_facts.packages"
+          - >-
+            'util-linux' in ansible_facts.packages or
+            'util-linux-core' in ansible_facts.packages
+        fail_msg: Neither util-linux nor util-linux-core is installed.
+      tags:
+        - fspart
+        - validate
 
-    - name: Check /tmp mount options
+    - name: Query persistent fstab entries
+      ansible.builtin.command:
+        argv:
+          - findmnt
+          - --fstab
+          - --target
+          - "{{ item }}"
+          - --output
+          - SOURCE,FSTYPE,OPTIONS
+          - --noheadings
+          - --raw
+      loop:
+        - /opt/test
+        - /var/tmp
+      register: fspart_verify_fstab
+      changed_when: false
+      tags:
+        - fspart
+        - validate
+
+    - name: Validate persistent fstab entries
+      ansible.builtin.assert:
+        quiet: true
+        that:
+          - item.rc == 0
+          - "'tmpfs' in item.stdout"
+          - "'nodev' in item.stdout"
+          - "'nosuid' in item.stdout"
+          - "'noexec' in item.stdout"
+      loop: "{{ fspart_verify_fstab.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+      tags:
+        - fspart
+        - validate
+
+    - name: Validate mounted filesystem options on systemd scenario
       ansible.builtin.command:
         argv:
           - findmnt
           - -O
           - nodev,nosuid,noexec
-          - /tmp
+          - "{{ item }}"
+      loop:
+        - /tmp
+        - /var/tmp
+        - /tmp_dir
       changed_when: false
-
-    - name: Check /var/tmp mount options
-      ansible.builtin.command:
-        argv:
-          - findmnt
-          - -O
-          - nodev,nosuid,noexec
-          - /var/tmp
-      changed_when: false
-
-    - name: Check /tmp_dir mount options
-      ansible.builtin.command:
-        argv:
-          - findmnt
-          - -O
-          - nodev,nosuid,noexec
-          - /tmp_dir
-      changed_when: false
+      when: fspart_molecule_systemd
+      tags:
+        - fspart
+        - validate

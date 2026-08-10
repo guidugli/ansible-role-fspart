@@ -1,10 +1,13 @@
 ---
 - name: Converge
   hosts: all
-  become: false
   gather_facts: true
   vars:
-    fs_world_writeable_fix_enabled: true
+    fspart_molecule_systemd: >-
+      {{ (ansible_facts['service_mgr'] | default('')) == 'systemd' }}
+    fs_fstrim_timer_enabled: false
+    fs_run_fix_permissions: false
+    fs_world_writeable_fix_enabled: false
     fspart_allow_reboot: false
     fspart_log_exception:
       - /var/log/gdm
@@ -12,21 +15,19 @@
       - /var/log/btmp
       - /var/log/lastlog
       - /var/log/wtmp
-
     partitions:
       - name: /opt/test
         unit_name: fstab
         src: tmpfs
         fstype: tmpfs
+        mount_state: "{{ 'mounted' if fspart_molecule_systemd else 'present' }}"
         mount_options:
           - strictatime
           - nodev
           - nosuid
           - noexec
-        validate_options:
-          - nodev
-          - nosuid
-          - noexec
+        validate_options: >-
+          {{ ['nodev', 'nosuid', 'noexec'] if fspart_molecule_systemd else [] }}
         autofix: true
 
       - name: /tmp
@@ -37,25 +38,22 @@
           - nodev
           - nosuid
           - noexec
-        validate_options:
-          - nodev
-          - nosuid
-          - noexec
-        autofix: true
+        validate_options: >-
+          {{ ['nodev', 'nosuid', 'noexec'] if fspart_molecule_systemd else [] }}
+        autofix: "{{ fspart_molecule_systemd }}"
 
       - name: /var/tmp
         unit_name: fstab
         src: tmpfs
         fstype: tmpfs
+        mount_state: "{{ 'mounted' if fspart_molecule_systemd else 'present' }}"
         mount_options:
           - strictatime
           - nodev
           - nosuid
           - noexec
-        validate_options:
-          - nodev
-          - nosuid
-          - noexec
+        validate_options: >-
+          {{ ['nodev', 'nosuid', 'noexec'] if fspart_molecule_systemd else [] }}
         autofix: true
 
       - name: /tmp_dir
@@ -66,11 +64,9 @@
           - nodev
           - nosuid
           - noexec
-        validate_options:
-          - nodev
-          - nosuid
-          - noexec
-        autofix: true
+        validate_options: >-
+          {{ ['nodev', 'nosuid', 'noexec'] if fspart_molecule_systemd else [] }}
+        autofix: "{{ fspart_molecule_systemd }}"
 
   pre_tasks:
     - name: Ensure /etc/fstab exists
@@ -82,6 +78,12 @@
         mode: '0644'
         owner: root
         group: root
+      tags:
+        - fspart
+        - config
 
   roles:
     - role: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"
+      tags:
+        - fspart
+        - config

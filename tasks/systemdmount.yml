@@ -4,6 +4,8 @@
     fspart_unit_notify: "{{ item.unit_name }}"
     fspart_mount_point: "{{ item.name }}"
   tags:
+    - fspart
+    - validate
     - facts
 
 - name: Check known remote systemd unit paths
@@ -19,6 +21,8 @@
     loop_var: fileitem
     label: "{{ fileitem }}"
   tags:
+    - fspart
+    - validate
     - facts
 
 - name: Store detected remote unit path information
@@ -34,15 +38,18 @@
     fspart_systemd_unit_path: "{{ fspart_detected_unit_paths | first | default('') }}"
     fspart_systemd_unit_found: "{{ fspart_detected_unit_paths | length > 0 }}"
   tags:
+    - fspart
+    - validate
     - facts
 
 - name: Check whether controller unit file exists
   ansible.builtin.stat:
     path: "{{ role_path }}/files/{{ item.unit_name }}"
   delegate_to: localhost
-  become: false
   register: fspart_controller_unit_file
   tags:
+    - fspart
+    - validate
     - facts
 
 - name: Show detected mount unit source
@@ -52,9 +59,14 @@
       - "Remote source: {{ fspart_systemd_unit_path | default('not found', true) }}"
       - "Controller source exists: {{ fspart_controller_unit_file.stat.exists }}"
   tags:
+    - fspart
+    - validate
     - debug
 
 - name: Copy mount unit into /etc/systemd/system when needed
+  tags:
+    - fspart
+    - config
   when: fspart_systemd_unit_path != (fspart_systemd_etc_path ~ '/' ~ item.unit_name)
   block:
     - name: Copy mount unit from remote systemd location when available
@@ -69,6 +81,7 @@
       when: fspart_systemd_unit_found
       notify: Reload systemd configuration
       tags:
+        - fspart
         - config
 
     - name: Copy mount unit from controller when no remote source exists
@@ -84,6 +97,7 @@
         - fspart_controller_unit_file.stat.exists
       notify: Reload systemd configuration
       tags:
+        - fspart
         - config
 
     - name: Fail when the mount unit was not found locally or remotely
@@ -95,6 +109,7 @@
         - not fspart_systemd_unit_found
         - not fspart_controller_unit_file.stat.exists
       tags:
+        - fspart
         - validate
 
 - name: Ensure the mount unit has an Install section
@@ -110,6 +125,7 @@
     - Restart systemd unit
     - Reboot
   tags:
+    - fspart
     - config
 
 - name: Ensure configured mount options are present in the mount unit
@@ -123,9 +139,11 @@
     - Restart systemd unit
     - Reboot
   tags:
+    - fspart
     - config
 
 - name: Flush handlers after mount unit changes
   ansible.builtin.meta: flush_handlers
   tags:
+    - fspart
     - service

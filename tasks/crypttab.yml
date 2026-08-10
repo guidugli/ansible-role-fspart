@@ -8,6 +8,7 @@
     state: directory
   when: fspart_cryptkeys_files | length > 0
   tags:
+    - fspart
     - config
 
 - name: Copy crypt key files
@@ -22,6 +23,7 @@
     label: "{{ item.name }}"
   when: fspart_cryptkeys_files | length > 0
   tags:
+    - fspart
     - config
 
 - name: Manage crypttab entries
@@ -36,6 +38,7 @@
     label: "{{ item.name }}"
   when: fspart_crypttab_entries | length > 0
   tags:
+    - fspart
     - config
 
 - name: Start systemd cryptsetup units for non-none password entries
@@ -51,4 +54,5 @@
     - fspart_crypttab_entries | length > 0
     - item.password | default('') != 'none'
   tags:
+    - fspart
     - service
